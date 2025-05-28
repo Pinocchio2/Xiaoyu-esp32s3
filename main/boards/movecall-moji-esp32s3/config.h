@@ -1,0 +1,61 @@
+#ifndef _BOARD_CONFIG_H_
+#define _BOARD_CONFIG_H_
+
+// Movecall Moji configuration
+
+#include <driver/gpio.h>
+
+#define AUDIO_INPUT_SAMPLE_RATE  24000
+#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+
+#define AUDIO_I2S_GPIO_MCLK GPIO_NUM_38
+#define AUDIO_I2S_GPIO_WS   GPIO_NUM_13
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_14
+#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_12
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_46
+
+#define AUDIO_CODEC_PA_PIN       GPIO_NUM_7
+#define AUDIO_CODEC_I2C_SDA_PIN  GPIO_NUM_1
+#define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_2
+#define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
+
+#define BUILTIN_LED_GPIO        GPIO_NUM_8
+#define BOOT_BUTTON_GPIO        GPIO_NUM_0
+
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_3
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+
+#define DISPLAY_SPI_SCLK_PIN    GPIO_NUM_16
+#define DISPLAY_SPI_MOSI_PIN    GPIO_NUM_17
+#define DISPLAY_SPI_CS_PIN      GPIO_NUM_15
+#define DISPLAY_SPI_DC_PIN      GPIO_NUM_7
+#define DISPLAY_SPI_RESET_PIN   GPIO_NUM_18
+
+#define DISPLAY_SPI_SCLK_HZ     (40 * 1000 * 1000)
+
+//LIS2DH12
+#define LIS2DH12_I2C_ADDRESS       0x19 // LIS2DH12TR I2C 地址
+#define LIS2DH12_CTRL_REG1         0x20 // 控制寄存器 1
+#define LIS2DH12_CTRL_REG3         0x22 // 控制寄存器 3
+#define LIS2DH12_INT1_CFG          0x30 // INT1 配置寄存器
+#define LIS2DH12_INT1_SRC          0x31 // INT1 状态寄存器
+#define LIS2DH12_INT1_THS          0x32 // INT1 阈值寄存器
+#define LIS2DH12_INT1_DURATION     0x33 // INT1 持续时间寄存器
+#define LIS2DH12_OUT_XYZ           0xA8 // 读取 XYZ 数据
+#define WAKEUP_INT_GPIO            GPIO_NUM_6  // 连接 LIS2DH12TR 的 INT1
+
+#define ML307_RX_PIN GPIO_NUM_18
+#define ML307_TX_PIN GPIO_NUM_17
+
+#define ENABLE_4G GPIO_NUM_5
+
+#endif // _BOARD_CONFIG_H_
