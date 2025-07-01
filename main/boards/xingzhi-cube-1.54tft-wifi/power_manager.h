@@ -7,24 +7,62 @@
 #include <esp_adc/adc_oneshot.h>
 
 
+/**
+ * @class PowerManager
+ * @brief 管理电池电量状态和充电状态的类。
+ *
+ * PowerManager 类用于监控电池电量状态和充电状态，并提供相应的回调函数以通知状态变化。
+ * 该类通过定时器定期检查电池电量，并根据 ADC 值计算电池电量百分比。同时，它还监控充电引脚的状态，
+ * 以确定设备是否正在充电。
+ *
+ * 核心功能包括：
+ * - 定期检查电池电量状态
+ * - 读取 ADC 值并计算电池电量百分比
+ * - 监控充电状态
+ * - 提供回调函数以通知电池电量状态和充电状态的变化
+ *
+ * 使用示例：
+ *
+ * 构造函数参数：
+ * - `gpio_num_t pin`：充电状态的 GPIO 引脚编号。
+ *
+ * 特殊使用限制或潜在的副作用：
+ * - 该类依赖于 ESP-IDF 框架，需要在 ESP32 环境中使用。
+ * - 定时器的周期设置为 1 秒，可以根据需要调整。
+ * - ADC 读取和电池电量计算依赖于硬件配置，可能需要根据实际硬件调整参数。
+ */
 class PowerManager {
 private:
+    // 定时器句柄
     esp_timer_handle_t timer_handle_;
+    // 充电状态改变回调函数
     std::function<void(bool)> on_charging_status_changed_;
+    // 低电量状态改变回调函数
     std::function<void(bool)> on_low_battery_status_changed_;
 
+    // 充电引脚
     gpio_num_t charging_pin_ = GPIO_NUM_NC;
+    // ADC 值队列
     std::vector<uint16_t> adc_values_;
+    // 电池电量
     uint32_t battery_level_ = 0;
+    // 是否正在充电
     bool is_charging_ = false;
+    // 是否低电量
     bool is_low_battery_ = false;
+    // tick 计数器
     int ticks_ = 0;
+    // ADC 读取间隔
     const int kBatteryAdcInterval = 60;
+    // ADC 读取数据数量
     const int kBatteryAdcDataCount = 3;
+    // 低电量阈值
     const int kLowBatteryLevel = 20;
 
+    // ADC 单元句柄
     adc_oneshot_unit_handle_t adc_handle_;
 
+    // 检查电池状态
     void CheckBatteryStatus() {
         // Get charging status
         bool new_charging_status = gpio_get_level(charging_pin_) == 1;
@@ -52,14 +90,17 @@ private:
 
     void ReadBatteryAdcData() {
         int adc_value;
-        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle_, ADC_CHANNEL_6, &adc_value));
+        // 读取 ADC 值
+        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle_, ADC_CHANNEL_2, &adc_value));
         
         // 将 ADC 值添加到队列中
         adc_values_.push_back(adc_value);
+        // 如果队列长度超过最大值，则删除第一个元素
         if (adc_values_.size() > kBatteryAdcDataCount) {
             adc_values_.erase(adc_values_.begin());
         }
         uint32_t average_adc = 0;
+        // 计算队列中所有 ADC 值的平均值
         for (auto value : adc_values_) {
             average_adc += value;
         }
@@ -97,8 +138,10 @@ private:
         }
 
         // Check low battery status
+        // 如果队列长度达到最大值，则检查电池电量是否低于最低值
         if (adc_values_.size() >= kBatteryAdcDataCount) {
             bool new_low_battery_status = battery_level_ <= kLowBatteryLevel;
+            // 如果电池电量状态发生变化，则调用回调函数
             if (new_low_battery_status != is_low_battery_) {
                 is_low_battery_ = new_low_battery_status;
                 if (on_low_battery_status_changed_) {
@@ -107,6 +150,7 @@ private:
             }
         }
 
+        // 打印 ADC 值、平均值和电池电量
         ESP_LOGI("PowerManager", "ADC value: %d average: %ld level: %ld", adc_value, average_adc, battery_level_);
     }
 

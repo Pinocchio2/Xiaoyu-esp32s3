@@ -5,6 +5,20 @@
 #include <esp_timer.h>
 #include <esp_pm.h>
 
+/**************************** CodeGeeX Inline Diff ****************************/
+/**
+ * @brief PowerSaveTimer 类用于管理设备的电源节能模式。
+ *
+ * 该类允许用户设置CPU的最大频率、进入睡眠模式的时间以及自动关机的时间。
+ * 用户可以通过设置回调函数来定义进入睡眠模式、退出睡眠模式和关机请求时的行为。
+ * 该类还提供了一个方法来手动唤醒设备。
+ *
+ * 示例用法：
+ *
+ * @param cpu_max_freq 构造函数参数，表示CPU的最大频率。
+ * @param seconds_to_sleep 构造函数参数，表示进入睡眠模式的时间（默认为20秒）。
+ * @param seconds_to_shutdown 构造函数参数，表示自动关机的时间（默认为-1，表示不自动关机）。
+ */
 class PowerSaveTimer {
 public:
     PowerSaveTimer(int cpu_max_freq, int seconds_to_sleep = 20, int seconds_to_shutdown = -1);
@@ -31,3 +45,4 @@ private:
     std::function<void()> on_exit_sleep_mode_;
     std::function<void()> on_shutdown_request_;
 };
+/******************** 5d8c8617-5401-432e-b6f9-1c058c551cdd ********************/
