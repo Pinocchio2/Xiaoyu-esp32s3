@@ -263,21 +263,31 @@ void Display::SetTheme(const std::string& theme_name) {
     settings.SetString("theme", theme_name);
 }
 
+// *** 在文件末尾添加这个新函数的定义 ***
+void Display::UpdateBluetoothStatus(bool is_enabled) {
+    // 加锁以保证LVGL操作的线程安全
+    DisplayLockGuard lock(this);
 
-// void Display::SetBluetoothIcon(bool enabled) {
-//     const char* icon = enabled ? FONT_AWESOME_BLUETOOTH : FONT_AWESOME_BLUETOOTH_OFF;
-    
-//     DisplayLockGuard lock(this);
-//     if (bluetooth_label_ != nullptr && bluetooth_icon_ != icon) {
-//         bluetooth_icon_ = icon;
-//         bluetooth_enabled_ = enabled;
-//         lv_label_set_text(bluetooth_label_, bluetooth_icon_);
-        
-//         // 根据状态设置图标颜色
-//         if (enabled) {
-//             lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x0066CC), 0); // 蓝色
-//         } else {
-//             lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x888888), 0); // 灰色
-//         }
-//     }
-// }
+    // 确保UI元素已创建
+    if (bluetooth_label_ == nullptr) {
+        return;
+    }
+
+    // 如果状态没有变化，则无需更新，提高效率
+    if (bluetooth_enabled_ == is_enabled) {
+        return;
+    }
+
+    bluetooth_enabled_ = is_enabled;
+
+    // 根据状态决定显示蓝牙图标或空字符串（即隐藏）
+    const char* icon = bluetooth_enabled_ ? FONT_AWESOME_BLUETOOTH : "";
+
+    lv_label_set_text(bluetooth_label_, icon);
+
+    // 对于单色屏，颜色设置不是必须的，但保留良好习惯
+    if (bluetooth_enabled_) {
+        // 在OLED上，文字颜色通常是与背景相反的
+        lv_obj_set_style_text_color(bluetooth_label_, lv_color_black(), 0);
+    }
+}

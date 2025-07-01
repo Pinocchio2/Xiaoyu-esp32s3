@@ -24,49 +24,18 @@ LV_FONT_DECLARE(font_puhui_14_1);
 LV_FONT_DECLARE(font_awesome_14_1);
 
 
-/**
- * @brief XINGZHI_CUBE_0_96OLED_ML307 类
- * 
- * 该类用于管理XINGZHI CUBE 0.96 OLED ML307设备，包括电源管理、显示、按钮和物联网功能。
- * 
- * 核心功能包括：
- * - 初始化电源管理器，处理充电状态变化。
- * - 初始化省电定时器，管理设备的睡眠模式和关机。
- * - 初始化I2C显示总线，设置SSD1306显示。
- * - 初始化按钮，处理按钮点击和长按事件。
- * - 初始化物联网功能，添加物联网设备。
- * 
- * 使用示例：
- * 
- * 构造函数参数：
- * - 无参数，构造函数内部会初始化所有必要的硬件和软件资源。
- * 
- * 特殊使用限制或潜在的副作用：
- * - 在初始化过程中，可能会占用较多的系统资源，建议在设备启动时调用。
- * - 省电模式会影响设备的响应速度，使用时请注意。
- */
 class XINGZHI_CUBE_0_96OLED_ML307 : public Ml307Board {
 private:
-    // I2C总线句柄
     i2c_master_bus_handle_t display_i2c_bus_;
-    // 启动按钮
     Button boot_button_;
-    // 音量加按钮
     Button volume_up_button_;
-    // 音量减按钮
     Button volume_down_button_;
-    // 显示对象
     Display* display_;
-    // 省电定时器
     PowerSaveTimer* power_save_timer_;
-    // 电源管理器
     PowerManager* power_manager_;
-    // 显示面板IO句柄
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
-    // 显示面板句柄
     esp_lcd_panel_handle_t panel_ = nullptr;
 
-    // 初始化电源管理器
     void InitializePowerManager() {
         power_manager_ = new PowerManager(GPIO_NUM_38);
         power_manager_->OnChargingStatusChanged([this](bool is_charging) {
@@ -78,47 +47,34 @@ private:
         });
     }
 
-    // 初始化省电定时器
     void InitializePowerSaveTimer() {
-        // 初始化GPIO 21
         rtc_gpio_init(GPIO_NUM_21);
-        // 设置GPIO 21为输出模式
         rtc_gpio_set_direction(GPIO_NUM_21, RTC_GPIO_MODE_OUTPUT_ONLY);
-        // 设置GPIO 21电平为高
         rtc_gpio_set_level(GPIO_NUM_21, 1);
 
-        // 创建一个新的省电定时器对象，参数分别为：初始状态、进入睡眠模式的延迟时间和唤醒延迟时间
         power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
-        
-        // 设置进入睡眠模式的回调函数
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Enabling sleep mode");
             auto display = GetDisplay();
             display->SetChatMessage("system", "");
             display->SetEmotion("sleepy");
         });
-        
-        // 设置退出睡眠模式的回调函数
         power_save_timer_->OnExitSleepMode([this]() {
             auto display = GetDisplay();
             display->SetChatMessage("system", "");
             display->SetEmotion("neutral");
         });
-        
-        // 设置关机请求的回调函数
         power_save_timer_->OnShutdownRequest([this]() {
             ESP_LOGI(TAG, "Shutting down");
             rtc_gpio_set_level(GPIO_NUM_21, 0);
+            // 启用保持功能，确保睡眠期间电平不变
             rtc_gpio_hold_en(GPIO_NUM_21);
-            esp_lcd_panel_disp_on_off(panel_, false);
+            esp_lcd_panel_disp_on_off(panel_, false); //关闭显示
             esp_deep_sleep_start();
         });
-        
-        // 启用省电定时器
         power_save_timer_->SetEnabled(true);
     }
 
-    // 初始化显示I2C总线
     void InitializeDisplayI2c() {
         i2c_master_bus_config_t bus_config = {
             .i2c_port = (i2c_port_t)0,
@@ -135,8 +91,8 @@ private:
         ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &display_i2c_bus_));
     }
 
-    // 初始化SSD1306显示
     void InitializeSsd1306Display() {
+        // SSD1306 config
         esp_lcd_panel_io_i2c_config_t io_config = {
             .dev_addr = 0x3C,
             .on_color_trans_done = nullptr,
@@ -167,6 +123,7 @@ private:
         ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(panel_io_, &panel_config, &panel_));
         ESP_LOGI(TAG, "SSD1306 driver installed");
 
+        // Reset the display
         ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_));
         if (esp_lcd_panel_init(panel_) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to initialize display");
@@ -174,6 +131,7 @@ private:
             return;
         }
 
+        // Set the display to on
         ESP_LOGI(TAG, "Turning display on");
         ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
 
@@ -181,7 +139,6 @@ private:
             {&font_puhui_14_1, &font_awesome_14_1});
     }
 
-    // 初始化按钮
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
@@ -224,7 +181,6 @@ private:
         });
     }
 
-    // 初始化物联网
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
@@ -232,7 +188,6 @@ private:
     }
 
 public:
-    // 构造函数
     XINGZHI_CUBE_0_96OLED_ML307() : Ml307Board(ML307_TX_PIN, ML307_RX_PIN, 4096),
         boot_button_(BOOT_BUTTON_GPIO),
         volume_up_button_(VOLUME_UP_BUTTON_GPIO),
@@ -245,25 +200,21 @@ public:
         InitializeIot();
     }
 
-    // 获取LED对象
     virtual Led* GetLed() override {
         static SingleLed led(BUILTIN_LED_GPIO);
         return &led;
     }
 
-    // 获取音频编解码器对象
     virtual AudioCodec* GetAudioCodec() override {
         static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
         return &audio_codec;
     }
 
-    // 获取显示对象
     virtual Display* GetDisplay() override {
         return display_;
     }
 
-    // 获取电池电量
     virtual bool GetBatteryLevel(int& level, bool& charging, bool& discharging) override {
         static bool last_discharging = false;
         charging = power_manager_->IsCharging();
@@ -276,7 +227,6 @@ public:
         return true;
     }
 
-    // 设置省电模式
     virtual void SetPowerSaveMode(bool enabled) override {
         if (!enabled) {
             power_save_timer_->WakeUp();

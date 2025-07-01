@@ -4,8 +4,7 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
-
-
+#include "display/display.h"
 
 #define TAG "BluetoothControl"
 
@@ -50,6 +49,7 @@ private:
         gpio_set_level(en_gpio_, 1);   // EN = 1
         gpio_set_level(rsv_gpio_, 0);  // RSV = 0
         bluetooth_enabled_ = false;
+        Board::GetInstance().GetDisplay()->UpdateBluetoothStatus(false); // 更新屏幕显示
         ESP_LOGI(TAG, "Bluetooth set to sleep mode (EN=1, RSV=0)");
     }
     
@@ -67,9 +67,18 @@ private:
         gpio_set_level(en_gpio_, 1);   // EN = 1
         
         bluetooth_enabled_ = true;
+        Board::GetInstance().GetDisplay()->UpdateBluetoothStatus(true);
         ESP_LOGI(TAG, "Bluetooth restarted (EN=1->0->1, RSV=1)");
     }
 
+    // 更新屏幕状态显示
+    void UpdateStatusOnScreen() {
+        // 通过 Board 单例获取 Display 对象并调用新接口
+        auto display = Board::GetInstance().GetDisplay();
+        if (display) {
+            display->UpdateBluetoothStatus(bluetooth_enabled_);
+        }
+    }
 
 public:
     BluetoothControl() : Thing("BluetoothControl", "蓝牙功能，可以打开或者关闭") {
@@ -85,13 +94,13 @@ public:
         methods_.AddMethod("TurnOnBluetooth", "打开蓝牙", ParameterList(), [this](const ParameterList& parameters) {
             ESP_LOGI(TAG, "TurnOnBluetooth method called!"); // 添加方法调用日志
             BluetoothRestart();
-            
-            
         });
         
         methods_.AddMethod("TurnOffBluetooth", "关闭蓝牙", ParameterList(), [this](const ParameterList& parameters) {
-            ESP_LOGI(TAG, "TurnOffBluetooth method called!"); 
+            ESP_LOGI(TAG, "TurnOffBluetooth method called!");
             BluetoothSleep();  // 执行蓝牙休眠
+        });
+        
         methods_.AddMethod("ToggleBluetooth", "切换蓝牙状态", ParameterList(), [this](const ParameterList& parameters) {
             ESP_LOGI(TAG, "ToggleBluetooth method called!"); // 添加方法调用日志
             if (bluetooth_enabled_) {
@@ -103,12 +112,11 @@ public:
             }
         });
         
-        ESP_LOGI(TAG, "BluetoothControl initialized successfully"); // 添加初始化完成日志    
-           
-        });
+        ESP_LOGI(TAG, "BluetoothControl initialized successfully"); // 添加初始化完成日志
     }
-}; // namespace iot
+};
 
-}
+} // namespace iot
+
 // 注册设备到IoT框架，使其可以被自动发现和管理
 DECLARE_THING(BluetoothControl);

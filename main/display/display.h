@@ -28,7 +28,14 @@ public:
     virtual void SetTheme(const std::string& theme_name);
     virtual std::string GetTheme() { return current_theme_name_; }
 
-    //void SetBluetoothIcon(bool enabled);
+    
+
+    /**
+     * @brief 新增：一个独立的接口，用于根据蓝牙状态更新屏幕图标。
+     * @param is_enabled true: 显示蓝牙图标, false: 隐藏图标
+     */
+    void UpdateBluetoothStatus(bool is_enabled);
+
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -64,9 +71,11 @@ protected:
 
     virtual void Update();
 
-    // lv_obj_t* bluetooth_label_ = nullptr;
-    // const char* bluetooth_icon_ = nullptr;
-    // bool bluetooth_enabled_ = false;
+    // *** 新增以下三个变量 ***
+    lv_obj_t* bluetooth_label_ = nullptr;     // 指向蓝牙图标的LVGL对象
+    const char* bluetooth_icon_ = nullptr;  // 存储当前图标的字符
+    bool bluetooth_enabled_ = false;          // 存储蓝牙的当前状态
+
 
 };
 

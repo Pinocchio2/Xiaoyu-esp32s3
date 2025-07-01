@@ -212,6 +212,14 @@ void OledDisplay::SetupUI_128x64() {
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, fonts_.icon_font, 0);
 
+    // *** 在这里新增蓝牙图标标签 ***
+    bluetooth_label_ = lv_label_create(status_bar_);
+    lv_label_set_text(bluetooth_label_, ""); // 初始不显示
+    lv_obj_set_style_text_font(bluetooth_label_, fonts_.icon_font, 0);
+    // 由于状态栏是flex布局，新添加的元素会自动排在最后，即最右侧
+
+
+
     low_battery_popup_ = lv_obj_create(screen);
     lv_obj_set_scrollbar_mode(low_battery_popup_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(low_battery_popup_, LV_HOR_RES * 0.9, fonts_.text_font->line_height * 2);
