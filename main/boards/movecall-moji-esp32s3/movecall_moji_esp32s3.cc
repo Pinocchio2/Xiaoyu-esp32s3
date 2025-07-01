@@ -1,9 +1,11 @@
 #include "wifi_board.h"
+#include "ml307_board.h"
+#include "dual_network_board.h" //新增切换类
 #include "audio_codecs/es8311_audio_codec.h"
-#include "display/lcd_display.h"
+//#include "display/lcd_ display.h"
 #include "application.h"
 #include "button.h"
-#include "config.h"
+#include "config.h" // OLED的I2C引脚和屏幕尺寸定义
 #include "iot/thing_manager.h"
 #include "led/single_led.h"
 
@@ -11,57 +13,69 @@
 #include <esp_log.h>
 #include <esp_efuse_table.h>
 #include <driver/i2c_master.h>
-
-#include <esp_lcd_panel_io.h>
+#include "display/oled_display.h"   // 使用OLED的显示类
 #include <esp_lcd_panel_ops.h>
-#include <esp_lcd_gc9a01.h>
+#include <esp_lcd_panel_vendor.h> // SSD1306驱动
 
 #include "driver/gpio.h"
-#include "driver/spi_master.h"
-
-#define TAG "MovecallMojiESP32S3"
-
-LV_FONT_DECLARE(font_puhui_20_4);
-LV_FONT_DECLARE(font_awesome_20_4);
 
 
-class CustomLcdDisplay : public SpiLcdDisplay {
-public:
-    CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle, 
-                    esp_lcd_panel_handle_t panel_handle,
-                    int width,
-                    int height,
-                    int offset_x,
-                    int offset_y,
-                    bool mirror_x,
-                    bool mirror_y,
-                    bool swap_xy) 
-        : SpiLcdDisplay(io_handle, panel_handle, width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy,
-                    {
-                        .text_font = &font_puhui_20_4,
-                        .icon_font = &font_awesome_20_4,
-                        .emoji_font = font_emoji_64_init(),
-                    }) {
 
-        DisplayLockGuard lock(this);
-        // 由于屏幕是圆的，所以状态栏需要增加左右内边距
-        lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.33, 0);
-        lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES * 0.33, 0);
-    }
-};
+#define TAG "MovecallMojiESP32S3_OLED" 
 
-class MovecallMojiESP32S3 : public WifiBoard {
+// 声明您要用于OLED的字体
+LV_FONT_DECLARE(font_puhui_14_1);    
+LV_FONT_DECLARE(font_awesome_14_1); 
+
+// 移除了 CustomLcdDisplay 类，因为我们将直接使用 OledDisplay 或其父类 Display
+
+class MovecallMojiESP32S3 : public DualNetworkBoard {
 private:
-    i2c_master_bus_handle_t codec_i2c_bus_;
+    i2c_master_bus_handle_t i2c_bus_; // 统一的I2C总线句柄，供显示屏和音频编解码器共用
     Button boot_button_;
-    Display* display_;
+    //增加两个按键
+    Button internal_button_;
+    Button wifi_switch_button_;
+    
+    //Button button2_;
+    esp_lcd_panel_io_handle_t panel_io_ = nullptr;
+    esp_lcd_panel_handle_t panel_ = nullptr;
+    Display* display_ = nullptr;
 
-    void InitializeCodecI2c() {
-        // Initialize I2C peripheral
+    void InitUart() {
+        ESP_LOGI(TAG, "初始化串口，用于血压数据接收");
+        
+        // 串口配置参数
+        uart_config_t uart_config = {
+            .baud_rate = 115200,                    // 波特率设置为115200
+            .data_bits = UART_DATA_8_BITS,        // 8位数据位
+            .parity = UART_PARITY_DISABLE,        // 无校验位
+            .stop_bits = UART_STOP_BITS_1,        // 1位停止位
+            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // 无硬件流控
+            .rx_flow_ctrl_thresh = 122,
+        };
+        
+        // 配置串口参数
+        ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
+        
+        // 配置串口引脚
+        ESP_ERROR_CHECK(uart_set_pin(UART_NUM_2, BT_TX_PIN, BT_RX_PIN, 
+                                    UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+        
+        // 安装串口驱动，设置缓冲区大小
+        const int uart_buffer_size = 1024;
+        ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, uart_buffer_size * 2, 0, 0, NULL, 0));
+        
+        ESP_LOGI(TAG, "串口初始化完成 - TX: GPIO%d, RX: GPIO%d, 波特率: %d", 
+                BT_TX_PIN, BT_RX_PIN, uart_config.baud_rate);
+    }
+
+    // 初始化共享的I2C总线
+    void InitializeI2cBus() {
         i2c_master_bus_config_t i2c_bus_cfg = {
-            .i2c_port = I2C_NUM_0,
-            .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN,
-            .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN,
+            .i2c_port = I2C_NUM_0, // 使用I2C0总线
+            .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN, // SDA引脚
+            .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN, // SCL引脚
             .clk_source = I2C_CLK_SRC_DEFAULT,
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
@@ -70,97 +84,146 @@ private:
                 .enable_internal_pullup = 1,
             },
         };
-        ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
+        ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_));
+        ESP_LOGI(TAG, "I2C总线初始化完成");
     }
 
-    // SPI初始化
-    void InitializeSpi() {
-        ESP_LOGI(TAG, "Initialize SPI bus");
-        spi_bus_config_t buscfg = GC9A01_PANEL_BUS_SPI_CONFIG(DISPLAY_SPI_SCLK_PIN, DISPLAY_SPI_MOSI_PIN, 
-                                    DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t));
-        ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
-    }
+    void InitializeSsd1306Display() {
+        // SSD1306 config
+        esp_lcd_panel_io_i2c_config_t io_config = {
+            .dev_addr = 0x3C,
+            .on_color_trans_done = nullptr,
+            .user_ctx = nullptr,
+            .control_phase_bytes = 1,
+            .dc_bit_offset = 6,
+            .lcd_cmd_bits = 8,
+            .lcd_param_bits = 8,
+            .flags = {
+                .dc_low_on_data = 0,
+                .disable_control_phase = 0,
+            },
+            .scl_speed_hz = 400 * 1000,
+        };
 
-    // GC9A01初始化
-    void InitializeGc9a01Display() {
-        ESP_LOGI(TAG, "Init GC9A01 display");
+        // 使用共享的I2C总线
+        ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c_v2(i2c_bus_, &io_config, &panel_io_));
 
-        ESP_LOGI(TAG, "Install panel IO");
-        esp_lcd_panel_io_handle_t io_handle = NULL;
-        esp_lcd_panel_io_spi_config_t io_config = GC9A01_PANEL_IO_SPI_CONFIG(DISPLAY_SPI_CS_PIN, DISPLAY_SPI_DC_PIN, NULL, NULL);
-        io_config.pclk_hz = DISPLAY_SPI_SCLK_HZ;
-        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &io_handle));
-    
-        ESP_LOGI(TAG, "Install GC9A01 panel driver");
-        esp_lcd_panel_handle_t panel_handle = NULL;
+        ESP_LOGI(TAG, "Install SSD1306 driver");
         esp_lcd_panel_dev_config_t panel_config = {};
-        panel_config.reset_gpio_num = DISPLAY_SPI_RESET_PIN;    // Set to -1 if not use
-        panel_config.rgb_endian = LCD_RGB_ENDIAN_BGR;           //LCD_RGB_ENDIAN_RGB;
-        panel_config.bits_per_pixel = 16;                       // Implemented by LCD command `3Ah` (16/18)
+        panel_config.reset_gpio_num = -1;
+        panel_config.bits_per_pixel = 1;
 
-        ESP_ERROR_CHECK(esp_lcd_new_panel_gc9a01(io_handle, &panel_config, &panel_handle));
-        ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
-        ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
-        ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, true));
-        ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
-        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true)); 
+        esp_lcd_panel_ssd1306_config_t ssd1306_config = {
+            .height = static_cast<uint8_t>(DISPLAY_HEIGHT),
+        };
+        panel_config.vendor_config = &ssd1306_config;
 
-        display_ = new SpiLcdDisplay(io_handle, panel_handle,
-                                    DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
-                                    {
-                                        .text_font = &font_puhui_20_4,
-                                        .icon_font = &font_awesome_20_4,
-                                        .emoji_font = font_emoji_64_init(),
-                                    });
+        ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(panel_io_, &panel_config, &panel_));
+        ESP_LOGI(TAG, "SSD1306 driver installed");
+
+        // Reset the display
+        ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_));
+        if (esp_lcd_panel_init(panel_) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize display");
+            display_ = new NoDisplay();
+            return;
+        }
+
+        // Set the display to on
+        ESP_LOGI(TAG, "Turning display on");
+        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
+
+        // 创建OLED显示对象
+        display_ = new OledDisplay(panel_io_, panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y,
+            {&font_puhui_14_1, &font_awesome_14_1});
     }
+
+
+    // void InitializeButtons() {
+    //     boot_button_.OnClick([this]() {
+    //         auto& app = Application::GetInstance();
+    //         // if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+    //         //     ResetWifiConfiguration();
+    //         // }
+    //         app.ToggleChatState();
+    //     });
+    // }
 
     void InitializeButtons() {
+        // Boot按键：切换聊天状态
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                ResetWifiConfiguration();
-            }
             app.ToggleChatState();
+        });
+
+        internal_button_.OnClick([this]() {
+            //ESP_LOGI(TAG, "Internal button pressed");
+            auto& app = Application::GetInstance();
+            app.ChangeChatState();
+        });
+        // WiFi切换按键 (key1 -> GPIO16)：切换网络类型
+        // wifi_switch_button_.OnClick([this]() {
+        //     ESP_LOGI(TAG, "WiFi切换按键被按下");
+            
+        //     // 切换网络类型
+        //     SwitchNetworkType();
+            
+        //     // 在OLED上显示当前网络状态
+        //     const char* current_network = (GetCurrentNetworkType() == kNetworkTypeWifi) ? "WiFi" : "4G";
+        //     if (display_) {
+        //         display_->SetChatMessage("系统", (std::string("已切换到: ") + current_network).c_str());
+        //     }
+        //     ESP_LOGI(TAG, "网络已切换到: %s", current_network);
+        // });
+
+        // 长按WiFi切换按键：显示当前网络状态
+        wifi_switch_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "WiFi切换按键长按");
+
+             SwitchNetworkType();
+            
+            // const char* current_network = (GetCurrentNetworkType() == kNetworkTypeWifi) ? "WiFi" : "4G";
+            // if (display_) {
+            //     display_->SetChatMessage("系统", (std::string("当前网络: ") + current_network).c_str());
+            // }
+            //ESP_LOGI(TAG, "当前网络类型: %s", current_network);
         });
     }
 
-    // 物联网初始化，添加对 AI 可见设备
+     virtual Display* GetDisplay() override {
+        return display_;
+    }
+
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker")); 
-        thing_manager.AddThing(iot::CreateThing("Screen"));   
+        // Screen Thing 
+         thing_manager.AddThing(iot::CreateThing("Screen"));
+         thing_manager.AddThing(iot::CreateThing("BluetoothControl"));   
     }
-
 public:
-    MovecallMojiESP32S3() : boot_button_(BOOT_BUTTON_GPIO) {  
-        InitializeCodecI2c();
-        InitializeSpi();
-        InitializeGc9a01Display();
-        InitializeButtons();
-        InitializeIot();
-        GetBacklight()->RestoreBrightness();
-    }
-
-    virtual Led* GetLed() override {
-        static SingleLed led_strip(BUILTIN_LED_GPIO);
-        return &led_strip;
-    }
-
-    virtual Display* GetDisplay() override {
-        return display_;
-    }
-    
-    virtual Backlight* GetBacklight() override {
-        static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
-        return &backlight;
+    MovecallMojiESP32S3() : 
+        DualNetworkBoard(ML307_TX_PIN, ML307_RX_PIN, 4096),
+        boot_button_(BOOT_BUTTON_GPIO),
+        internal_button_(INTERNAL_BUTTON_GPIO), // 新增内部按钮
+        wifi_switch_button_(NETWORK_SWITCH_BUTTON_GPIO) {  
+        InitializeI2cBus();          // 首先初始化I2C总线
+        InitializeSsd1306Display();  // 然后初始化显示屏
+        InitUart();                  // 初始化串口
+        InitializeButtons();         // 初始化按钮
+        InitializeIot();             // 初始化IOT
     }
 
     virtual AudioCodec* GetAudioCodec() override {
-        static Es8311AudioCodec audio_codec(codec_i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+        // 使用共享的I2C总线
+        static Es8311AudioCodec audio_codec(i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
             AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR);
         return &audio_codec;
     }
+   
+
+
 };
 
 DECLARE_BOARD(MovecallMojiESP32S3);

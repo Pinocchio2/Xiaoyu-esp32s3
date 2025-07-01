@@ -9,7 +9,7 @@
 #include "font_awesome_symbols.h"
 #include "iot/thing_manager.h"
 #include "assets/lang_config.h"
-
+#include "stdio.h"
 #include <cstring>
 #include <esp_log.h>
 #include <cJSON.h>
@@ -281,6 +281,44 @@ void Application::ToggleChatState() {
     }
 }
 
+
+void Application::ChangeChatState() {
+    if (device_state_ == kDeviceStateActivating) {
+        SetDeviceState(kDeviceStateIdle);
+        return;
+    }
+
+    if (!protocol_) {
+        ESP_LOGE(TAG, "Protocol not initialized");
+        return;
+    }
+
+    if (device_state_ == kDeviceStateIdle) {
+        Schedule([this]() {
+            SetDeviceState(kDeviceStateConnecting);
+            if (!protocol_->OpenAudioChannel()) {
+                return;
+            }
+            protocol_->SendWakeWordDetected("你好小鱼");
+            SetListeningMode(realtime_chat_enabled_ ? kListeningModeRealtime : kListeningModeAutoStop);
+        });
+    } else if (device_state_ == kDeviceStateSpeaking) {
+        Schedule([this]() {
+            AbortSpeaking(kAbortReasonWakeWordDetected);
+            
+        });
+        
+    } else if (device_state_ == kDeviceStateListening) {
+        // Schedule([this]() {
+
+        //     //重新监听
+        //     ESP_LOGI(TAG, "===>重新监听");
+
+        //     SetListeningMode(realtime_chat_enabled_ ? kListeningModeRealtime : kListeningModeAutoStop);
+        // });
+    }
+}
+
 void Application::StartListening() {
     if (device_state_ == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
@@ -358,6 +396,19 @@ void Application::Start() {
     }
     codec->Start();
 
+    // 启动串口监听任务
+    xTaskCreatePinnedToCore(
+        [](void* param) {
+            static_cast<Application*>(param)->UartListenTask();
+        },
+        "uart_listen_task",  // 任务名称
+        8192,                // 栈大小
+        this,                // 参数
+        4,                   // 优先级
+        &uart_listen_task_handle_, // 任务句柄
+        1                    // 运行在核心1
+    );
+
     xTaskCreatePinnedToCore([](void* arg) {
         Application* app = (Application*)arg;
         app->AudioLoop();
@@ -401,6 +452,8 @@ void Application::Start() {
         if (thing_manager.GetStatesJson(states, false)) {
             protocol_->SendIotStates(states);
         }
+    
+
     });
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveMode(true);
@@ -429,6 +482,10 @@ void Application::Start() {
                         if (listening_mode_ == kListeningModeManualStop) {
                             SetDeviceState(kDeviceStateIdle);
                         } else {
+                            aborted_ = false;
+                            ResetDecoder();
+                            PlaySound(Lang::Sounds::P3_SUCCESS);
+                            vTaskDelay(pdMS_TO_TICKS(300));
                             SetDeviceState(kDeviceStateListening);
                         }
                     }
@@ -460,10 +517,12 @@ void Application::Start() {
         } else if (strcmp(type->valuestring, "iot") == 0) {
             auto commands = cJSON_GetObjectItem(root, "commands");
             if (commands != NULL) {
+                 ESP_LOGI(TAG, "Received IoT commands, count: %d", cJSON_GetArraySize(commands));/////////
                 auto& thing_manager = iot::ThingManager::GetInstance();
                 for (int i = 0; i < cJSON_GetArraySize(commands); ++i) {
                     auto command = cJSON_GetArrayItem(commands, i);
                     thing_manager.Invoke(command);
+                    //ESP_LOGI(TAG, "IoT command %d: %s", i, command_str);//////
                 }
             }
         } else if (strcmp(type->valuestring, "system") == 0) {
@@ -915,6 +974,8 @@ void Application::WakeWordInvoke(const std::string& wake_word) {
     }
 }
 
+
+
 bool Application::CanEnterSleepMode() {
     if (device_state_ != kDeviceStateIdle) {
         return false;
@@ -926,4 +987,203 @@ bool Application::CanEnterSleepMode() {
 
     // Now it is safe to enter sleep mode
     return true;
+}
+
+void Application::UartListenTask() {
+  ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
+  ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
+  
+  // 分配缓冲区
+  const int buffer_size = 1024;
+  uint8_t* buffer = (uint8_t*)malloc(buffer_size);
+  
+  if (buffer == nullptr) {
+    ESP_LOGE(TAG, "UART监听任务内存分配失败，任务退出");
+    vTaskDelete(nullptr);
+    return;
+  }
+  
+  ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
+  
+  // 持续监听循环 - 永不停止
+  while (true) {
+    // 从UART读取数据，100ms超时
+    int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size - 1, pdMS_TO_TICKS(30));
+    
+    if (length > 0) {
+      //ESP_LOGI(TAG, "接收到串口数据，长度: %d字节", length);
+      
+      // 显示原始十六进制数据用于调试
+    //   ESP_LOGI(TAG, "原始数据(十六进制):");
+    //   for (int i = 0; i < length; i++) {
+    //     printf("%02X ", buffer[i]);
+    //   }
+    //   printf("\n");
+      
+      // 检查是否是包含JSON数据的协议包
+      if (length >= 6 && buffer[0] == 0x55) {
+        uint8_t frame_type = buffer[1];      // 帧类别：1=状态帧，2=数据帧
+        uint8_t frame_length = buffer[2];    // 帧长度
+        
+        ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
+        
+        // 检查帧长度是否与实际接收长度匹配
+        if (frame_length != length) {
+          ESP_LOGW(TAG, "帧长度不匹配，声明长度: %d，实际接收: %d", frame_length, length);
+          continue;
+        }
+        
+        if (frame_type == 0x01) {
+          // 状态帧处理 - 按之前的二进制协议处理
+          if (length >= 6) {
+            uint8_t event_type = buffer[3];   // 事件类型：0x01连接，0x02断开，0x00心跳
+            uint8_t device_type = buffer[4];  // 设备类型：0x01血压计，0x02体温计
+            
+            ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
+            
+            // 跳过心跳数据（事件类型为0x00）
+            if (event_type == 0x00) {
+              ESP_LOGI(TAG, "收到心跳数据，跳过处理");
+              continue;
+            }
+            
+            // 设备名称映射（中文）
+            const char* device_name_cn;
+            switch (device_type) {
+              case 0x01:
+                device_name_cn = "血压计";
+                break;
+              case 0x02:
+                device_name_cn = "体温计";
+                break;
+              case 0x03:
+                device_name_cn = "血糖仪";
+                break;
+              case 0x04:
+                device_name_cn = "血氧仪";
+                break;
+              default:
+                device_name_cn = "未知设备";
+                break;
+            }
+            
+            // 连接状态映射（中文）
+            const char* status_cn;
+            switch (event_type) {
+              case 0x01:
+                status_cn = "蓝牙已连接";
+                break;
+              case 0x02:
+                status_cn = "蓝牙已断开";
+                break;
+              default:
+                status_cn = "状态未知";
+                break;
+            }
+            
+            // 构造状态包 JSON（语音播报格式）
+            char json_buffer[256];
+            snprintf(json_buffer, sizeof(json_buffer), 
+                     "{\"type\":\"text2speech\", \"text\":\"%s%s\"}", 
+                     device_name_cn, status_cn);
+            
+            ESP_LOGI(TAG, "状态包JSON: %s", json_buffer);
+            
+            // 发送状态包
+            if (protocol_) {
+              protocol_->SendCustomText(json_buffer);
+              if (device_state_ == kDeviceStateListening) {
+                Schedule([this]() {
+                    aborted_ = false;
+                    SetDeviceState(kDeviceStateSpeaking);
+                });
+             }
+            }
+          }
+        } else if (frame_type == 0x02) {
+          // 数据帧处理 - 提取JSON字符串
+          
+          // 查找JSON数据的开始位置（查找第一个'{'）
+          int json_start = -1;
+          int json_end = -1;
+          
+          for (int i = 3; i < length; i++) {
+            if (buffer[i] == '{') {
+              json_start = i;
+              break;
+            }
+          }
+          
+          // 查找JSON数据的结束位置（查找最后一个'}'）
+          for (int i = length - 2; i >= 0; i--) { // 跳过最后的校验字节
+            if (buffer[i] == '}') {
+              json_end = i;
+              break;
+            }
+          }
+          
+          if (json_start != -1 && json_end != -1 && json_end > json_start) {
+            // 提取JSON字符串
+            int json_length = json_end - json_start + 1;
+            char* json_string = (char*)malloc(json_length + 1);
+            
+            if (json_string) {
+              memcpy(json_string, &buffer[json_start], json_length);
+              json_string[json_length] = '\0';
+              
+              ESP_LOGI(TAG, "提取的JSON数据: %s", json_string);
+              
+              // 直接转发JSON数据
+              if (protocol_) {
+                protocol_->SendCustomText(json_string);
+                ESP_LOGI(TAG, "JSON数据已转发");
+              }
+              
+              free(json_string);
+            } else {
+              ESP_LOGE(TAG, "JSON字符串内存分配失败");
+            }
+          } else {
+            ESP_LOGW(TAG, "未找到有效的JSON数据");
+            
+            // 如果找不到JSON格式，尝试将整个数据包转换为字符串并转发
+            char* fallback_string = (char*)malloc(length + 1);
+            if (fallback_string) {
+              memcpy(fallback_string, buffer, length);
+              fallback_string[length] = '\0';
+              
+              ESP_LOGI(TAG, "转发原始数据: %s", fallback_string);
+              
+              if (protocol_) {
+                protocol_->SendCustomText(fallback_string);
+              }
+              
+              free(fallback_string);
+            }
+          }
+        } else {
+          ESP_LOGW(TAG, "未知帧类型: 0x%02X", frame_type);
+        }
+      }
+    //   else {
+    //     ESP_LOGW(TAG, "无效的数据帧格式或帧头不正确");
+        
+    //     // 如果不是协议格式，尝试直接作为字符串处理
+    //     buffer[length] = '\0'; // 添加字符串结束符
+    //     char* data_string = (char*)buffer;
+        
+    //     ESP_LOGI(TAG, "非协议数据，直接转发: %s", data_string);
+        
+    //     if (protocol_) {
+    //       protocol_->SendCustomText(data_string);
+    //     }
+    //   }
+    }
+    
+    // 任务延迟，避免占用过多CPU资源
+    //vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  
+  // 清理资源（实际上不会执行到这里，因为是无限循环）
+  free(buffer);
 }

@@ -28,6 +28,8 @@ public:
     virtual void SetTheme(const std::string& theme_name);
     virtual std::string GetTheme() { return current_theme_name_; }
 
+    //void SetBluetoothIcon(bool enabled);
+
     inline int width() const { return width_; }
     inline int height() const { return height_; }
 
@@ -61,6 +63,11 @@ protected:
     virtual void Unlock() = 0;
 
     virtual void Update();
+
+    // lv_obj_t* bluetooth_label_ = nullptr;
+    // const char* bluetooth_icon_ = nullptr;
+    // bool bluetooth_enabled_ = false;
+
 };
 
 

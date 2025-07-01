@@ -66,6 +66,7 @@ public:
     void DismissAlert();
     void AbortSpeaking(AbortReason reason);
     void ToggleChatState();
+    void ChangeChatState();
     void StartListening();
     void StopListening();
     void UpdateIotStates();
@@ -105,6 +106,9 @@ private:
 
     // Audio encode / decode
     TaskHandle_t audio_loop_task_handle_ = nullptr;
+
+    TaskHandle_t uart_listen_task_handle_ = nullptr;  // 串口监听任务句柄
+
     BackgroundTask* background_task_ = nullptr;
     std::chrono::steady_clock::time_point last_output_time_;
     std::list<std::vector<uint8_t>> audio_decode_queue_;
@@ -118,6 +122,10 @@ private:
     OpusResampler output_resampler_;
 
     void MainEventLoop();
+    //--------------------------------//
+    //void SendBloodPressureData(const std::string& bp_data);
+    void UartListenTask();
+    //--------------------------------//
     void OnAudioInput();
     void OnAudioOutput();
     void ReadAudio(std::vector<int16_t>& data, int sample_rate, int samples);

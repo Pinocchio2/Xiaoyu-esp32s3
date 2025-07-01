@@ -262,3 +262,22 @@ void Display::SetTheme(const std::string& theme_name) {
     Settings settings("display", true);
     settings.SetString("theme", theme_name);
 }
+
+
+// void Display::SetBluetoothIcon(bool enabled) {
+//     const char* icon = enabled ? FONT_AWESOME_BLUETOOTH : FONT_AWESOME_BLUETOOTH_OFF;
+    
+//     DisplayLockGuard lock(this);
+//     if (bluetooth_label_ != nullptr && bluetooth_icon_ != icon) {
+//         bluetooth_icon_ = icon;
+//         bluetooth_enabled_ = enabled;
+//         lv_label_set_text(bluetooth_label_, bluetooth_icon_);
+        
+//         // 根据状态设置图标颜色
+//         if (enabled) {
+//             lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x0066CC), 0); // 蓝色
+//         } else {
+//             lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x888888), 0); // 灰色
+//         }
+//     }
+// }

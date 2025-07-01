@@ -886,3 +886,19 @@ void LcdDisplay::SetTheme(const std::string& theme_name) {
     // No errors occurred. Save theme to settings
     Display::SetTheme(theme_name);
 }
+
+// void LcdDisplay::CreateStatusBar() {
+//     // ... existing code ...
+    
+//     // 创建蓝牙图标标签
+//     bluetooth_label_ = lv_label_create(status_bar_);
+//     lv_obj_set_style_text_font(bluetooth_label_, icon_font_, 0);
+//     lv_label_set_text(bluetooth_label_, FONT_AWESOME_BLUETOOTH_OFF);
+//     lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x888888), 0);
+    
+//     // 设置蓝牙图标位置（在WiFi图标旁边）
+//     lv_obj_align_to(bluetooth_label_, wifi_label_, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    
+//     bluetooth_icon_ = FONT_AWESOME_BLUETOOTH_OFF;
+//     bluetooth_enabled_ = false;
+// }

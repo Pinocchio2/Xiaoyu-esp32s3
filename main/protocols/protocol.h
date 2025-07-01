@@ -56,6 +56,12 @@ public:
     virtual void SendAbortSpeaking(AbortReason reason);
     virtual void SendIotDescriptors(const std::string& descriptors);
     virtual void SendIotStates(const std::string& states);
+    // 新增：直接发送文本消息
+    virtual bool SendCustomText(const std::string& text);/////////////////////////
+    // 发送带类型标识的自定义消息
+    virtual bool SendCustomMessage(const std::string& type, const std::string& data);
+  
+    
 
 protected:
     std::function<void(const cJSON* root)> on_incoming_json_;

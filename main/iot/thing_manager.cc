@@ -52,12 +52,14 @@ bool ThingManager::GetStatesJson(std::string& json, bool delta) {
 
 void ThingManager::Invoke(const cJSON* command) {
     auto name = cJSON_GetObjectItem(command, "name");
+    ESP_LOGI(TAG, "Invoking command for thing: %s", name->valuestring);
     for (auto& thing : things_) {
         if (thing->name() == name->valuestring) {
             thing->Invoke(command);
             return;
         }
     }
+    ESP_LOGE(TAG, "Thing not found: %s", name->valuestring);
 }
 
 } // namespace iot

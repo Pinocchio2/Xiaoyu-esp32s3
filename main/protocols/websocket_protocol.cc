@@ -162,3 +162,9 @@ void WebsocketProtocol::ParseServerHello(const cJSON* root) {
 
     xEventGroupSetBits(event_group_handle_, WEBSOCKET_PROTOCOL_SERVER_HELLO_EVENT);
 }
+
+
+// bool WebsocketProtocol::SendText(const std::string& text) {
+//     // 具体的WebSocket发送逻辑
+//     return websocket_->Send(text);
+// }

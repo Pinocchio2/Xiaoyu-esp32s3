@@ -115,6 +115,7 @@ void Protocol::SendIotStates(const std::string& states) {
     SendText(message);
 }
 
+
 bool Protocol::IsTimeout() const {
     const int kTimeoutSeconds = 120;
     auto now = std::chrono::steady_clock::now();
@@ -130,3 +131,16 @@ bool Protocol::IsAudioChannelBusy() const {
     return busy_sending_audio_;
 }
 
+///////////////////////////////新增///////////////////
+bool Protocol::SendCustomText(const std::string& text) {
+    return SendText(text);
+}
+
+bool Protocol::SendCustomMessage(const std::string& type, const std::string& data) {
+    std::string message = "{";
+    message += "\"session_id\":\"" + session_id_ + "\",";
+    message += "\"type\":\"" + type + "\",";
+    message += "\"custom_data\":" + data;
+    message += "}";
+    return SendText(message);
+}

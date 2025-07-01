@@ -47,6 +47,9 @@
 
         "VOLUME":"音量 ",
         "MUTED":"已静音",
-        "MAX_VOLUME":"最大音量"
+        "MAX_VOLUME":"最大音量",
+
+        "SWITCH_TO_WIFI_NETWORK": "切换到 Wi-Fi...",
+        "SWITCH_TO_4G_NETWORK": "切换到 4G..."
     }
 }
