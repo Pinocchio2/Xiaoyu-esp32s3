@@ -18,6 +18,7 @@
 #include <esp_lcd_panel_vendor.h> // SSD1306驱动
 
 #include "driver/gpio.h"
+#include "power_manager.h"
 
 
 
@@ -41,6 +42,12 @@ private:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
     Display* display_ = nullptr;
+
+    PowerManager* power_manager_ = nullptr;
+
+    void InitializePowerManager() {
+        power_manager_ = new PowerManager();
+    }
 
     void InitUart() {
         ESP_LOGI(TAG, "初始化串口，用于血压数据接收");
@@ -188,16 +195,17 @@ private:
     void InitializeIot() {
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker")); 
-        // Screen Thing 
-         thing_manager.AddThing(iot::CreateThing("Screen"));
-         thing_manager.AddThing(iot::CreateThing("BluetoothControl"));   
+        thing_manager.AddThing(iot::CreateThing("Screen"));
+        thing_manager.AddThing(iot::CreateThing("BluetoothControl")); 
+        thing_manager.AddThing(iot::CreateThing("Battery"));  
     }
 public:
     MovecallMojiESP32S3() : 
         DualNetworkBoard(ML307_TX_PIN, ML307_RX_PIN, 4096),
         boot_button_(BOOT_BUTTON_GPIO),
         internal_button_(INTERNAL_BUTTON_GPIO), // 新增内部按钮
-        wifi_switch_button_(NETWORK_SWITCH_BUTTON_GPIO) {  
+        wifi_switch_button_(NETWORK_SWITCH_BUTTON_GPIO) { 
+        InitializePowerManager();    // 初始化电源管理 
         InitializeI2cBus();          // 首先初始化I2C总线
         InitializeSsd1306Display();  // 然后初始化显示屏
         InitUart();                  // 初始化串口
@@ -211,6 +219,16 @@ public:
             AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
             AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR);
         return &audio_codec;
+    }
+    
+    virtual bool GetBatteryLevel(int& level, bool& charging, bool& discharging) override {
+        if (!power_manager_) {
+            return false;
+        }
+        charging = power_manager_->IsCharging();
+        discharging = power_manager_->IsDischarging();
+        level = power_manager_->GetBatteryLevel();
+        return true;
     }
    
 

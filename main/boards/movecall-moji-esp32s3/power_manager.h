@@ -39,56 +39,78 @@ private:
         }
     }
 
-    void ReadBatteryAdcData() {
-        int adc_value;
-        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle_, ADC_CHANNEL_2, &adc_value));
-        
-        adc_values_.push_back(adc_value);
-        if (adc_values_.size() > kBatteryAdcDataCount) {
-            adc_values_.erase(adc_values_.begin());
-        }
-        uint32_t average_adc = std::accumulate(adc_values_.begin(), adc_values_.end(), 0) / adc_values_.size();
-        
-        if (previous_average_adc_ != -1) {
-            if (average_adc > previous_average_adc_ + 2) {
-                is_charging_ = true;
-            } 
-            else if (average_adc < previous_average_adc_ - 2) {
-                is_charging_ = false;
+    private:
+        // 增加充电状态稳定性检查的变量
+        int charging_stable_count_ = 0;
+        int discharging_stable_count_ = 0;
+        const int kChargingStableThreshold = 3;  // 需要连续3次检测才确认状态改变
+        const int kChargingAdcThreshold = 10;    // 增加ADC阈值到10
+    
+        void ReadBatteryAdcData() {
+            int adc_value;
+            ESP_ERROR_CHECK(adc_oneshot_read(adc_handle_, ADC_CHANNEL_2, &adc_value));
+            
+            adc_values_.push_back(adc_value);
+            if (adc_values_.size() > kBatteryAdcDataCount) {
+                adc_values_.erase(adc_values_.begin());
             }
-        }
-        previous_average_adc_ = average_adc;
-
-        const struct {
-            uint16_t adc;
-            uint8_t level;
-        } levels[] = {
-            {1985, 0}, {2079, 20}, {2141, 40}, {2296, 60}, {2420, 80}, {2606, 100}
-        };
-
-        if (average_adc < levels[0].adc) {
-            battery_level_ = 0;
-        } else if (average_adc >= levels[5].adc) {
-            battery_level_ = 100;
-        } else {
-            for (int i = 0; i < 5; i++) {
-                if (average_adc >= levels[i].adc && average_adc < levels[i+1].adc) {
-                    float ratio = static_cast<float>(average_adc - levels[i].adc) / (levels[i+1].adc - levels[i].adc);
-                    battery_level_ = levels[i].level + ratio * (levels[i+1].level - levels[i].level);
-                    break;
+            uint32_t average_adc = std::accumulate(adc_values_.begin(), adc_values_.end(), 0) / adc_values_.size();
+            
+            if (previous_average_adc_ != -1) {
+                // 检测到电压上升趋势
+                if (average_adc > previous_average_adc_ + kChargingAdcThreshold) {
+                    charging_stable_count_++;
+                    discharging_stable_count_ = 0;
+                    
+                    // 连续检测到充电趋势才改变状态
+                    if (charging_stable_count_ >= kChargingStableThreshold) {
+                        is_charging_ = true;
+                    }
+                } 
+                // 检测到电压下降趋势
+                else if (average_adc < previous_average_adc_ - kChargingAdcThreshold) {
+                    discharging_stable_count_++;
+                    charging_stable_count_ = 0;
+                    
+                    // 连续检测到放电趋势才改变状态
+                    if (discharging_stable_count_ >= kChargingStableThreshold) {
+                        is_charging_ = false;
+                    }
+                }
+                // ADC值变化不大，重置计数器
+                else {
+                    charging_stable_count_ = 0;
+                    discharging_stable_count_ = 0;
+                }
+            }
+            previous_average_adc_ = average_adc;
+        
+            const struct {
+                uint16_t adc;
+                uint8_t level;
+            } levels[] = {
+                {1985, 0}, 
+                {2079, 20}, 
+                {2141, 40}, 
+                {2296, 60}, 
+                {2420, 80}, 
+                {2606, 100}
+            };
+        
+            if (average_adc < levels[0].adc) {
+                battery_level_ = 0;
+            } else if (average_adc >= levels[5].adc) {
+                battery_level_ = 100;
+            } else {
+                for (int i = 0; i < 5; i++) {
+                    if (average_adc >= levels[i].adc && average_adc < levels[i+1].adc) {
+                        float ratio = static_cast<float>(average_adc - levels[i].adc) / (levels[i+1].adc - levels[i].adc);
+                        battery_level_ = levels[i].level + ratio * (levels[i+1].level - levels[i].level);
+                        break;
+                    }
                 }
             }
         }
-
-        if (adc_values_.size() >= kBatteryAdcDataCount) {
-            bool new_low_battery_status = battery_level_ <= kLowBatteryLevel;
-            if (new_low_battery_status != is_low_battery_) {
-                is_low_battery_ = new_low_battery_status;
-                if (on_low_battery_status_changed_) { on_low_battery_status_changed_(is_low_battery_); }
-            }
-        }
-        ESP_LOGI("PowerManager", "average: %ld level: %ld%% charging: %s", average_adc, battery_level_, is_charging_ ? "true" : "false");
-    }
 
 public:
     PowerManager() {
