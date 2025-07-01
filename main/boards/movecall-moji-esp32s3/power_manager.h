@@ -34,6 +34,17 @@ private:
         }
 
         ticks_++;
+        
+        // *** 每60秒输出一次状态报告 ***
+        if (ticks_ % (kBatteryAdcInterval * 60) == 0) {
+            ESP_LOGI("PowerManager", "=== 电池状态报告 ===");
+            ESP_LOGI("PowerManager", "电池电量: %d%%", battery_level_);
+            ESP_LOGI("PowerManager", "充电状态: %s", is_charging_ ? "充电中" : "未充电");
+            ESP_LOGI("PowerManager", "低电量状态: %s", is_low_battery_ ? "是" : "否");
+            ESP_LOGI("PowerManager", "平均ADC值: %d", previous_average_adc_);
+            ESP_LOGI("PowerManager", "========================");
+        }
+        
         if (ticks_ % kBatteryAdcInterval == 0) {
             ReadBatteryAdcData();
         }
@@ -43,7 +54,7 @@ private:
         // 增加充电状态稳定性检查的变量
         int charging_stable_count_ = 0;
         int discharging_stable_count_ = 0;
-        const int kChargingStableThreshold = 3;  // 需要连续3次检测才确认状态改变
+        const int kChargingStableThreshold = 2;  // 需要连续3次检测才确认状态改变
         const int kChargingAdcThreshold = 10;    // 增加ADC阈值到10
     
         void ReadBatteryAdcData() {
@@ -56,25 +67,45 @@ private:
             }
             uint32_t average_adc = std::accumulate(adc_values_.begin(), adc_values_.end(), 0) / adc_values_.size();
             
+            // *** 添加调试日志 ***
+            ESP_LOGI("PowerManager", "ADC读取: 当前值=%d, 平均值=%d, 上次平均值=%d", 
+                     adc_value, average_adc, previous_average_adc_);
+            
+            // 保存之前的充电状态用于比较
+            bool previous_charging_state = is_charging_;
+            
             if (previous_average_adc_ != -1) {
+                int adc_diff = average_adc - previous_average_adc_;
+                ESP_LOGI("PowerManager", "ADC变化: %+d (阈值: ±%d)", adc_diff, kChargingAdcThreshold);
+                
                 // 检测到电压上升趋势
                 if (average_adc > previous_average_adc_ + kChargingAdcThreshold) {
                     charging_stable_count_++;
                     discharging_stable_count_ = 0;
+                    ESP_LOGI("PowerManager", "检测到充电趋势，稳定计数: %d/%d", 
+                             charging_stable_count_, kChargingStableThreshold);
                     
                     // 连续检测到充电趋势才改变状态
                     if (charging_stable_count_ >= kChargingStableThreshold) {
-                        is_charging_ = true;
+                        if (!is_charging_) {
+                            is_charging_ = true;
+                            ESP_LOGI("PowerManager", "*** 充电状态变更: 开始充电 ***");
+                        }
                     }
                 } 
                 // 检测到电压下降趋势
                 else if (average_adc < previous_average_adc_ - kChargingAdcThreshold) {
                     discharging_stable_count_++;
                     charging_stable_count_ = 0;
+                    ESP_LOGI("PowerManager", "检测到放电趋势，稳定计数: %d/%d", 
+                             discharging_stable_count_, kChargingStableThreshold);
                     
                     // 连续检测到放电趋势才改变状态
                     if (discharging_stable_count_ >= kChargingStableThreshold) {
-                        is_charging_ = false;
+                        if (is_charging_) {
+                            is_charging_ = false;
+                            ESP_LOGI("PowerManager", "*** 充电状态变更: 停止充电 ***");
+                        }
                     }
                 }
                 // ADC值变化不大，重置计数器
@@ -84,19 +115,33 @@ private:
                 }
             }
             previous_average_adc_ = average_adc;
-        
+            
+            // *** 当充电状态发生变化时调用回调函数 ***
+            if (previous_charging_state != is_charging_) {
+                ESP_LOGI("PowerManager", "=== 充电状态变化通知: %s -> %s ===", 
+                         previous_charging_state ? "充电中" : "未充电",
+                         is_charging_ ? "充电中" : "未充电");
+                
+                if (on_charging_status_changed_) {
+                    on_charging_status_changed_(is_charging_);
+                } else {
+                    ESP_LOGW("PowerManager", "警告: 充电状态回调函数未设置!");
+                }
+            }
+
             const struct {
                 uint16_t adc;
                 uint8_t level;
             } levels[] = {
-                {1985, 0}, 
-                {2079, 20}, 
-                {2141, 40}, 
-                {2296, 60}, 
-                {2420, 80}, 
+                {2500, 0}, 
+                {2520, 20}, 
+                {2550, 40}, 
+                {2590, 60}, 
+                {2600, 80}, 
                 {2606, 100}
             };
-        
+
+            uint8_t old_battery_level = battery_level_;
             if (average_adc < levels[0].adc) {
                 battery_level_ = 0;
             } else if (average_adc >= levels[5].adc) {
@@ -110,33 +155,56 @@ private:
                     }
                 }
             }
+            
+            // *** 添加电池电量变化日志 ***
+            if (old_battery_level != battery_level_) {
+                ESP_LOGI("PowerManager", "电池电量变化: %d%% -> %d%% (充电状态: %s)", 
+                         old_battery_level, battery_level_, is_charging_ ? "充电中" : "未充电");
+            }
         }
 
 public:
+    // 构造函数
     PowerManager() {
+        // 创建定时器参数
         esp_timer_create_args_t timer_args = {
+            // 回调函数
             .callback = [](void* arg) { static_cast<PowerManager*>(arg)->CheckBatteryStatus(); },
+            // 参数
             .arg = this,
+            // 分发方法
             .dispatch_method = ESP_TIMER_TASK,
+            // 定时器名称
             .name = "battery_check_timer",
         };
+        // 创建定时器
         ESP_ERROR_CHECK(esp_timer_create(&timer_args, &timer_handle_));
+        // 启动定时器
         ESP_ERROR_CHECK(esp_timer_start_periodic(timer_handle_, 1000000));
 
+        // 创建ADC单次测量单元参数
         adc_oneshot_unit_init_cfg_t init_config = {
+            // 单元ID
             .unit_id = ADC_UNIT_1,
         };
+        // 创建ADC单次测量单元
         ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle_));
         
+        // 创建ADC单次测量通道参数
         adc_oneshot_chan_cfg_t chan_config = {
+            // 电压衰减
             .atten = ADC_ATTEN_DB_12,
+            // 位宽
             .bitwidth = ADC_BITWIDTH_12,
         };
+        // 配置ADC单次测量通道
         ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle_, ADC_CHANNEL_2, &chan_config));
     }
 
     ~PowerManager() {
+        // 如果timer_handle_不为空，则停止定时器并删除定时器
         if (timer_handle_) { esp_timer_stop(timer_handle_); esp_timer_delete(timer_handle_); }
+        // 如果adc_handle_不为空，则删除adc单元
         if (adc_handle_) { adc_oneshot_del_unit(adc_handle_); }
     }
 
@@ -144,8 +212,12 @@ public:
         return is_charging_;
     }
 
+    // 判断是否在放电
     bool IsDischarging() { return !is_charging_; }
+    // 获取电池电量
     uint8_t GetBatteryLevel() { return battery_level_; }
+    // 当低电量状态改变时调用回调函数
     void OnLowBatteryStatusChanged(std::function<void(bool)> callback) { on_low_battery_status_changed_ = callback; }
+    // 当充电状态改变时调用回调函数
     void OnChargingStatusChanged(std::function<void(bool)> callback) { on_charging_status_changed_ = callback; }
 };

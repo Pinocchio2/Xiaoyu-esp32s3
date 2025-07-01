@@ -46,7 +46,30 @@ private:
     PowerManager* power_manager_ = nullptr;
 
     void InitializePowerManager() {
+        ESP_LOGI(TAG, "初始化电源管理器...");
         power_manager_ = new PowerManager();
+        
+        // *** 设置充电状态变化回调 ***
+        power_manager_->OnChargingStatusChanged([this](bool is_charging) {
+            ESP_LOGI(TAG, ">>> 充电状态变化回调触发: %s <<<", 
+                     is_charging ? "开始充电" : "停止充电");
+            
+            // 这里可以添加其他充电状态变化时的处理逻辑
+            // 例如：控制LED指示灯、调整功耗模式等
+            if (is_charging) {
+                ESP_LOGI(TAG, "充电开始 - 可以在这里添加充电指示逻辑");
+            } else {
+                ESP_LOGI(TAG, "充电停止 - 可以在这里添加断电处理逻辑");
+            }
+        });
+        
+        // *** 设置低电量状态变化回调 ***
+        power_manager_->OnLowBatteryStatusChanged([this](bool is_low_battery) {
+            ESP_LOGI(TAG, ">>> 低电量状态变化: %s <<<", 
+                     is_low_battery ? "低电量警告" : "电量正常");
+        });
+        
+        ESP_LOGI(TAG, "电源管理器初始化完成，回调函数已设置");
     }
 
     void InitUart() {
