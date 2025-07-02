@@ -11,14 +11,19 @@
 
 #define TAG "WS"
 
+// 构造函数，创建一个事件组
 WebsocketProtocol::WebsocketProtocol() {
+    // 创建一个事件组
     event_group_handle_ = xEventGroupCreate();
 }
 
+// 析构函数，释放资源
 WebsocketProtocol::~WebsocketProtocol() {
+    // 如果websocket_不为空，则删除
     if (websocket_ != nullptr) {
         delete websocket_;
     }
+    // 删除事件组
     vEventGroupDelete(event_group_handle_);
 }
 

@@ -464,10 +464,19 @@ void Application::Start() {
         });
     });
     protocol_->OnIncomingJson([this, display](const cJSON* root) {
-        // Parse JSON data
+        
+         // 添加这段代码来打印所有消息的state字段
+        // auto state = cJSON_GetObjectItem(root, "state");
+        // if (state != NULL) {
+        //     ESP_LOGI(TAG, "收到JSON消息，state值: %s", state->valuestring);
+        // }
+
         auto type = cJSON_GetObjectItem(root, "type");
         if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
+
+            ESP_LOGI(TAG, "收到TTS消息，state值: %s", state->valuestring);//添加日志 
+
             if (strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
                     aborted_ = false;
@@ -1025,11 +1034,11 @@ void Application::UartListenTask() {
         uint8_t frame_type = buffer[1];      // 帧类别：1=状态帧，2=数据帧
         uint8_t frame_length = buffer[2];    // 帧长度
         
-        ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
+        //ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
         
         // 检查帧长度是否与实际接收长度匹配
         if (frame_length != length) {
-          ESP_LOGW(TAG, "帧长度不匹配，声明长度: %d，实际接收: %d", frame_length, length);
+          //ESP_LOGW(TAG, "帧长度不匹配，声明长度: %d，实际接收: %d", frame_length, length);
           continue;
         }
         
@@ -1039,11 +1048,11 @@ void Application::UartListenTask() {
             uint8_t event_type = buffer[3];   // 事件类型：0x01连接，0x02断开，0x00心跳
             uint8_t device_type = buffer[4];  // 设备类型：0x01血压计，0x02体温计
             
-            ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
+            //ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
             
             // 跳过心跳数据（事件类型为0x00）
             if (event_type == 0x00) {
-              ESP_LOGI(TAG, "收到心跳数据，跳过处理");
+              //ESP_LOGI(TAG, "收到心跳数据，跳过处理");
               continue;
             }
             

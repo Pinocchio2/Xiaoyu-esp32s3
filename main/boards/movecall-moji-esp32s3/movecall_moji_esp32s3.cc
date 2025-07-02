@@ -139,16 +139,7 @@ private:
     }
 
 
-    // void InitializeButtons() {
-    //     boot_button_.OnClick([this]() {
-    //         auto& app = Application::GetInstance();
-    //         // if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-    //         //     ResetWifiConfiguration();
-    //         // }
-    //         app.ToggleChatState();
-    //     });
-    // }
-
+   
     void InitializeButtons() {
         // Boot按键：切换聊天状态
         boot_button_.OnClick([this]() {
@@ -161,32 +152,13 @@ private:
             auto& app = Application::GetInstance();
             app.ChangeChatState();
         });
-        // WiFi切换按键 (key1 -> GPIO16)：切换网络类型
-        // wifi_switch_button_.OnClick([this]() {
-        //     ESP_LOGI(TAG, "WiFi切换按键被按下");
-            
-        //     // 切换网络类型
-        //     SwitchNetworkType();
-            
-        //     // 在OLED上显示当前网络状态
-        //     const char* current_network = (GetCurrentNetworkType() == kNetworkTypeWifi) ? "WiFi" : "4G";
-        //     if (display_) {
-        //         display_->SetChatMessage("系统", (std::string("已切换到: ") + current_network).c_str());
-        //     }
-        //     ESP_LOGI(TAG, "网络已切换到: %s", current_network);
-        // });
-
-        // 长按WiFi切换按键：显示当前网络状态
+      
         wifi_switch_button_.OnLongPress([this]() {
             ESP_LOGI(TAG, "WiFi切换按键长按");
 
              SwitchNetworkType();
             
-            // const char* current_network = (GetCurrentNetworkType() == kNetworkTypeWifi) ? "WiFi" : "4G";
-            // if (display_) {
-            //     display_->SetChatMessage("系统", (std::string("当前网络: ") + current_network).c_str());
-            // }
-            //ESP_LOGI(TAG, "当前网络类型: %s", current_network);
+           
         });
     }
 
