@@ -1025,7 +1025,7 @@ void Application::UartListenTask() {
         uint8_t frame_type = buffer[1];      // 帧类别：1=状态帧，2=数据帧
         uint8_t frame_length = buffer[2];    // 帧长度
         
-        ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
+        //ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
         
         // 检查帧长度是否与实际接收长度匹配
         if (frame_length != length) {
@@ -1039,11 +1039,11 @@ void Application::UartListenTask() {
             uint8_t event_type = buffer[3];   // 事件类型：0x01连接，0x02断开，0x00心跳
             uint8_t device_type = buffer[4];  // 设备类型：0x01血压计，0x02体温计
             
-            ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
+            //ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
             
             // 跳过心跳数据（事件类型为0x00）
             if (event_type == 0x00) {
-              ESP_LOGI(TAG, "收到心跳数据，跳过处理");
+              //ESP_LOGI(TAG, "收到心跳数据，跳过处理");
               continue;
             }
             
