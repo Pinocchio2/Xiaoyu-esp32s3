@@ -1004,7 +1004,10 @@ vTaskDelete(nullptr);
  }
 
 ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
-// 持续监听循环 - 永不停止
+
+// 血氧计数
+static int64_t last_spo2_send_time = 0;
+
 while (true) {
 // 从UART读取数据，可以读满整个缓冲区
  int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
@@ -1110,11 +1113,37 @@ while (true) {
                             memcpy(json_string, &current_frame[json_start], json_length);
                             json_string[json_length] = '\0';
                             ESP_LOGI(TAG, "提取的JSON数据: %s", json_string);
-                            
-                            if (protocol_) {
-                                protocol_->SendCustomText(json_string);
-                                ESP_LOGI(TAG, "JSON数据已转发");
+                            //////////////////////////////优化血氧发送逻辑//////////////////////////////
+                            if (strstr(json_string, "\"case\":\"spo2\"") != NULL) {
+                                // 是血氧数据，执行节流逻辑
+                                int64_t current_time = esp_timer_get_time();
+                                const int64_t FIVE_SECONDS_US = 5 * 1000 * 1000;
+
+                                // 如果是第一次发送，或距离上次发送已超过5秒
+                                if (last_spo2_send_time == 0 || (current_time - last_spo2_send_time) > FIVE_SECONDS_US) {
+                                    ESP_LOGI(TAG, "血氧数据满足5秒发送间隔，准备转发...");
+                                    if (protocol_) {
+                                        protocol_->SendCustomText(json_string);
+                                        ESP_LOGI(TAG, "JSON数据已转发");
+                                    }
+                                    // 更新发送时间戳
+                                    last_spo2_send_time = current_time;
+                                } else {
+                                    // 发送间隔未到，丢弃本次数据
+                                    ESP_LOGD(TAG, "血氧数据接收频繁，本次丢弃。");
+                                }
+                            } else {
+                                // 不是血氧数据，直接转发
+                                if (protocol_) {
+                                    protocol_->SendCustomText(json_string);
+                                    ESP_LOGI(TAG, "JSON数据已转发");
+                                }
                             }
+                            
+                            // if (protocol_) {
+                            //     protocol_->SendCustomText(json_string);
+                            //     ESP_LOGI(TAG, "JSON数据已转发");
+                            // }
                             free(json_string);
                         } else {
                             ESP_LOGE(TAG, "JSON字符串内存分配失败");
