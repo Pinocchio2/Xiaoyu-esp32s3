@@ -990,200 +990,158 @@ bool Application::CanEnterSleepMode() {
 }
 
 void Application::UartListenTask() {
-  ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
-  ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
-  
-  // 分配缓冲区
-  const int buffer_size = 1024;
-  uint8_t* buffer = (uint8_t*)malloc(buffer_size);
-  
-  if (buffer == nullptr) {
-    ESP_LOGE(TAG, "UART监听任务内存分配失败，任务退出");
-    vTaskDelete(nullptr);
-    return;
-  }
-  
-  ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
-  
-  // 持续监听循环 - 永不停止
-  while (true) {
-    // 从UART读取数据，100ms超时
-    int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size - 1, pdMS_TO_TICKS(30));
-    
-    if (length > 0) {
-      //ESP_LOGI(TAG, "接收到串口数据，长度: %d字节", length);
-      
-      // 显示原始十六进制数据用于调试
-    //   ESP_LOGI(TAG, "原始数据(十六进制):");
-    //   for (int i = 0; i < length; i++) {
-    //     printf("%02X ", buffer[i]);
-    //   }
-    //   printf("\n");
-      
-      // 检查是否是包含JSON数据的协议包
-      if (length >= 6 && buffer[0] == 0x55) {
-        uint8_t frame_type = buffer[1];      // 帧类别：1=状态帧，2=数据帧
-        uint8_t frame_length = buffer[2];    // 帧长度
+    ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
+    ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
+
+// 分配缓冲区
+const int buffer_size = 1024;
+uint8_t* buffer = (uint8_t*)malloc(buffer_size);
+
+if (buffer == nullptr) {
+ESP_LOGE(TAG, "UART监听任务内存分配失败，任务退出");
+vTaskDelete(nullptr);
+ return;
+ }
+
+ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
+// 持续监听循环 - 永不停止
+while (true) {
+// 从UART读取数据，可以读满整个缓冲区
+ int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
+ 
+ if (length > 0) {
         
-        ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
         
-        // 检查帧长度是否与实际接收长度匹配
-        if (frame_length != length) {
-          ESP_LOGW(TAG, "帧长度不匹配，声明长度: %d，实际接收: %d", frame_length, length);
-          continue;
-        }
+        // 偏移量来追踪已处理的字节
+        int processed_offset = 0;
         
-        if (frame_type == 0x01) {
-          // 状态帧处理 - 按之前的二进制协议处理
-          if (length >= 6) {
-            uint8_t event_type = buffer[3];   // 事件类型：0x01连接，0x02断开，0x00心跳
-            uint8_t device_type = buffer[4];  // 设备类型：0x01血压计，0x02体温计
-            
-            ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
-            
-            // 跳过心跳数据（事件类型为0x00）
-            if (event_type == 0x00) {
-              ESP_LOGI(TAG, "收到心跳数据，跳过处理");
-              continue;
-            }
-            
-            // 设备名称映射（中文）
-            const char* device_name_cn;
-            switch (device_type) {
-              case 0x01:
-                device_name_cn = "血压计";
-                break;
-              case 0x02:
-                device_name_cn = "体温计";
-                break;
-              case 0x03:
-                device_name_cn = "血糖仪";
-                break;
-              case 0x04:
-                device_name_cn = "血氧仪";
-                break;
-              default:
-                device_name_cn = "未知设备";
+        // 循环处理接收到的缓冲区，直到所有字节都被检查过
+        while (processed_offset < length) {
+
+            // 指向当前待处理数据的指针
+            uint8_t* current_frame = buffer + processed_offset;
+            // 缓冲区中剩余待处理的数据长度
+            int remaining_len = length - processed_offset;
+
+            // 协议要求的最短长度（例如：帧头+类型+长度+校验至少需要几个字节）
+            const int MIN_FRAME_LEN = 6; 
+            if (remaining_len < MIN_FRAME_LEN) {
+                // 剩余数据不够一个最小帧，无法解析，直接退出本次处理循环
                 break;
             }
-            
-            // 连接状态映射（中文）
-            const char* status_cn;
-            switch (event_type) {
-              case 0x01:
-                status_cn = "蓝牙已连接";
-                break;
-              case 0x02:
-                status_cn = "蓝牙已断开";
-                break;
-              default:
-                status_cn = "状态未知";
-                break;
-            }
-            
-            // 构造状态包 JSON（语音播报格式）
-            char json_buffer[256];
-            snprintf(json_buffer, sizeof(json_buffer), 
-                     "{\"type\":\"text2speech\", \"text\":\"%s%s\"}", 
-                     device_name_cn, status_cn);
-            
-            ESP_LOGI(TAG, "状态包JSON: %s", json_buffer);
-            
-            // 发送状态包
-            if (protocol_) {
-              protocol_->SendCustomText(json_buffer);
-              if (device_state_ == kDeviceStateListening) {
-                Schedule([this]() {
-                    aborted_ = false;
-                    SetDeviceState(kDeviceStateSpeaking);
-                });
-             }
-            }
-          }
-        } else if (frame_type == 0x02) {
-          // 数据帧处理 - 提取JSON字符串
-          
-          // 查找JSON数据的开始位置（查找第一个'{'）
-          int json_start = -1;
-          int json_end = -1;
-          
-          for (int i = 3; i < length; i++) {
-            if (buffer[i] == '{') {
-              json_start = i;
-              break;
-            }
-          }
-          
-          // 查找JSON数据的结束位置（查找最后一个'}'）
-          for (int i = length - 2; i >= 0; i--) { // 跳过最后的校验字节
-            if (buffer[i] == '}') {
-              json_end = i;
-              break;
-            }
-          }
-          
-          if (json_start != -1 && json_end != -1 && json_end > json_start) {
-            // 提取JSON字符串
-            int json_length = json_end - json_start + 1;
-            char* json_string = (char*)malloc(json_length + 1);
-            
-            if (json_string) {
-              memcpy(json_string, &buffer[json_start], json_length);
-              json_string[json_length] = '\0';
-              
-              ESP_LOGI(TAG, "提取的JSON数据: %s", json_string);
-              
-              // 直接转发JSON数据
-              if (protocol_) {
-                protocol_->SendCustomText(json_string);
-                ESP_LOGI(TAG, "JSON数据已转发");
-              }
-              
-              free(json_string);
+
+            // 检查帧头是否是我们协议的 0x55
+            if (current_frame[0] == 0x55) {
+                uint8_t frame_type = current_frame[1];      // 帧类别：1=状态帧，2=数据帧
+                uint8_t frame_length = current_frame[2];    // 帧长度
+                
+                // 【关键改动】检查帧长度的有效性，并判断数据是否完整
+                if (frame_length < MIN_FRAME_LEN) {
+                    ESP_LOGW(TAG, "帧长度声明错误: %d, 小于最小长度 %d", frame_length, MIN_FRAME_LEN);
+                    processed_offset++; // 跳过这个错误的帧头，继续寻找
+                    continue;
+                }
+                
+                if (remaining_len < frame_length) {
+                    ESP_LOGW(TAG, "数据包不完整，声明长度: %d，实际剩余: %d", frame_length, remaining_len);
+                    // 剩余数据不足一个完整帧，跳出循环，等待下一次读取
+                    break;
+                }
+                
+               // ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
+                
+                if (frame_type == 0x01) {
+                    // 状态帧处理 - 注意: 此处所有对 buffer 的访问都改为 current_frame
+                    uint8_t event_type = current_frame[3];
+                    uint8_t device_type = current_frame[4];
+                    //ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
+                    
+                    if (event_type == 0x00) {
+                       // ESP_LOGI(TAG, "收到心跳数据，跳过处理");
+                    } else {
+                        const char* device_name_cn = "未知设备";
+                        switch (device_type) {
+                            case 0x01: device_name_cn = "血压计"; break;
+                            case 0x02: device_name_cn = "体温计"; break;
+                            case 0x03: device_name_cn = "血糖仪"; break;
+                            case 0x04: device_name_cn = "血氧仪"; break;
+                        }
+                        const char* status_cn = "状态未知";
+                        switch (event_type) {
+                            case 0x01: status_cn = "蓝牙已连接"; break;
+                            case 0x02: status_cn = "蓝牙已断开"; break;
+                        }
+                        char json_buffer[256];
+                        snprintf(json_buffer, sizeof(json_buffer), "{\"type\":\"text2speech\", \"text\":\"%s%s\"}", device_name_cn, status_cn);
+                        ESP_LOGI(TAG, "状态包JSON: %s", json_buffer);
+                        
+                        if (protocol_) {
+                            protocol_->SendCustomText(json_buffer);
+                            if (device_state_ == kDeviceStateListening) {
+                                Schedule([this]() {
+                                    aborted_ = false;
+                                    SetDeviceState(kDeviceStateSpeaking);
+                                });
+                            }
+                        }
+                    }
+                } else if (frame_type == 0x02) {
+                    // 数据帧处理 - 同样，所有对 buffer 和 length 的访问都改为 current_frame 和 frame_length
+                    int json_start = -1;
+                    int json_end = -1;
+                    
+                    for (int i = 3; i < frame_length; i++) {
+                        if (current_frame[i] == '{') {
+                            json_start = i;
+                            break;
+                        }
+                    }
+                    for (int i = frame_length - 2; i >= 3; i--) { // 结束位置从帧尾部向前找
+                        if (current_frame[i] == '}') {
+                            json_end = i;
+                            break;
+                        }
+                    }
+                    
+                    if (json_start != -1 && json_end != -1 && json_end > json_start) {
+                        int json_length = json_end - json_start + 1;
+                        char* json_string = (char*)malloc(json_length + 1);
+                        if (json_string) {
+                            memcpy(json_string, &current_frame[json_start], json_length);
+                            json_string[json_length] = '\0';
+                            ESP_LOGI(TAG, "提取的JSON数据: %s", json_string);
+                            
+                            if (protocol_) {
+                                protocol_->SendCustomText(json_string);
+                                ESP_LOGI(TAG, "JSON数据已转发");
+                            }
+                            free(json_string);
+                        } else {
+                            ESP_LOGE(TAG, "JSON字符串内存分配失败");
+                        }
+                    } else {
+                         ESP_LOGW(TAG, "未找到有效的JSON数据");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "未知帧类型: 0x%02X", frame_type);
+                }
+                
+                // 处理完一个帧后，将偏移量向前移动整个帧的长度
+                processed_offset += frame_length;
+
             } else {
-              ESP_LOGE(TAG, "JSON字符串内存分配失败");
+                // 如果当前字节不是帧头，则跳过这个字节，继续在缓冲区中向后寻找
+               // ESP_LOGW(TAG, "在偏移量 %d 处未找到帧头0x55,跳过1字节", processed_offset);
+                processed_offset++;//
             }
-          } else {
-            ESP_LOGW(TAG, "未找到有效的JSON数据");
-            
-            // 如果找不到JSON格式，尝试将整个数据包转换为字符串并转发
-            char* fallback_string = (char*)malloc(length + 1);
-            if (fallback_string) {
-              memcpy(fallback_string, buffer, length);
-              fallback_string[length] = '\0';
-              
-              ESP_LOGI(TAG, "转发原始数据: %s", fallback_string);
-              
-              if (protocol_) {
-                protocol_->SendCustomText(fallback_string);
-              }
-              
-              free(fallback_string);
-            }
-          }
-        } else {
-          ESP_LOGW(TAG, "未知帧类型: 0x%02X", frame_type);
         }
-      }
-    //   else {
-    //     ESP_LOGW(TAG, "无效的数据帧格式或帧头不正确");
-        
-    //     // 如果不是协议格式，尝试直接作为字符串处理
-    //     buffer[length] = '\0'; // 添加字符串结束符
-    //     char* data_string = (char*)buffer;
-        
-    //     ESP_LOGI(TAG, "非协议数据，直接转发: %s", data_string);
-        
-    //     if (protocol_) {
-    //       protocol_->SendCustomText(data_string);
-    //     }
-    //   }
-    }
-    
-    // 任务延迟，避免占用过多CPU资源
-    //vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  
-  // 清理资源（实际上不会执行到这里，因为是无限循环）
-  free(buffer);
+       
+}
+
+// 任务延迟，避免占用过多CPU资源
+//vTaskDelay(pdMS_TO_TICKS(10));
+ }
+
+// 清理资源（实际上不会执行到这里，因为是无限循环）
+ free(buffer);
 }
