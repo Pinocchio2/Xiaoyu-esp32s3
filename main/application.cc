@@ -1030,9 +1030,9 @@ void Application::UartListenTask() {
                         continue;
                     }
 
-                    // ====================== START: 状态帧处理 (已恢复) ======================
+                    
                     if (frame_type == 0x01) {
-                                      // ====================== START: 状态帧去抖优化 ======================
+                                      
                         uint8_t event_type = current_frame[3];
                         uint8_t device_type = current_frame[4];
 
@@ -1047,7 +1047,7 @@ void Application::UartListenTask() {
                         // device_last_event_state_[device_type] 如果不存在，默认值为0
                         if (device_last_event_state_[device_type] == event_type) {
                             // 状态未变，是重复包，直接丢弃
-                            ESP_LOGI(TAG, "接收到重复的状态帧，已忽略。");
+                            //ESP_LOGI(TAG, "接收到重复的状态帧，已忽略。");
                         } else {
                             // 状态发生变化，处理并更新状态
                             device_last_event_state_[device_type] = event_type;
@@ -1103,7 +1103,7 @@ void Application::UartListenTask() {
                                 if (strstr(json_string, "\"case\":\"spo2\"") != NULL) {
                                     // 血氧数据节流逻辑
                                     int64_t current_time = esp_timer_get_time();
-                                    const int64_t FIVE_SECONDS_US = 5 * 1000 * 1000;
+                                    const int64_t FIVE_SECONDS_US = 8 * 1000 * 1000;
 
                                     if (last_spo2_send_time == 0 || (current_time - last_spo2_send_time) > FIVE_SECONDS_US) {
                                         ESP_LOGI(TAG, "转发血氧数据。"); // 优化日志
