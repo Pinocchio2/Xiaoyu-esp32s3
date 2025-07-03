@@ -93,6 +93,7 @@ private:
     esp_timer_handle_t clock_timer_handle_ = nullptr;
     volatile DeviceState device_state_ = kDeviceStateUnknown;
     ListeningMode listening_mode_ = kListeningModeAutoStop;
+    std::map<uint8_t, uint8_t> device_last_event_state_;/////
 #if CONFIG_USE_REALTIME_CHAT
     bool realtime_chat_enabled_ = true;
 #else

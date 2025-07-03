@@ -989,188 +989,156 @@ bool Application::CanEnterSleepMode() {
     return true;
 }
 
+
+
 void Application::UartListenTask() {
     ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
     ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
 
-// 分配缓冲区
-const int buffer_size = 1024;
-uint8_t* buffer = (uint8_t*)malloc(buffer_size);
+    const int buffer_size = 1024;
+    uint8_t* buffer = (uint8_t*)malloc(buffer_size);
 
-if (buffer == nullptr) {
-ESP_LOGE(TAG, "UART监听任务内存分配失败，任务退出");
-vTaskDelete(nullptr);
- return;
- }
+    if (buffer == nullptr) {
+        ESP_LOGE(TAG, "UART监听任务内存分配失败，任务退出");
+        vTaskDelete(nullptr);
+        return;
+    }
 
-ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
+    ESP_LOGI(TAG, "UART监听任务内存分配成功，开始监听串口数据...");
 
-// 血氧计数
-static int64_t last_spo2_send_time = 0;
+    static int64_t last_spo2_send_time = 0;
 
-while (true) {
-// 从UART读取数据，可以读满整个缓冲区
- int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
- 
- if (length > 0) {
-        
-        
-        // 偏移量来追踪已处理的字节
-        int processed_offset = 0;
-        
-        // 循环处理接收到的缓冲区，直到所有字节都被检查过
-        while (processed_offset < length) {
+    while (true) {
+        int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
 
-            // 指向当前待处理数据的指针
-            uint8_t* current_frame = buffer + processed_offset;
-            // 缓冲区中剩余待处理的数据长度
-            int remaining_len = length - processed_offset;
+        if (length > 0) {
+            int processed_offset = 0;
 
-            // 协议要求的最短长度（例如：帧头+类型+长度+校验至少需要几个字节）
-            const int MIN_FRAME_LEN = 6; 
-            if (remaining_len < MIN_FRAME_LEN) {
-                // 剩余数据不够一个最小帧，无法解析，直接退出本次处理循环
-                break;
-            }
+            while (processed_offset < length) {
+                uint8_t* current_frame = buffer + processed_offset;
+                int remaining_len = length - processed_offset;
+                const int MIN_FRAME_LEN = 6;
 
-            // 检查帧头是否是我们协议的 0x55
-            if (current_frame[0] == 0x55) {
-                uint8_t frame_type = current_frame[1];      // 帧类别：1=状态帧，2=数据帧
-                uint8_t frame_length = current_frame[2];    // 帧长度
-                
-                // 【关键改动】检查帧长度的有效性，并判断数据是否完整
-                if (frame_length < MIN_FRAME_LEN) {
-                    ESP_LOGW(TAG, "帧长度声明错误: %d, 小于最小长度 %d", frame_length, MIN_FRAME_LEN);
-                    processed_offset++; // 跳过这个错误的帧头，继续寻找
-                    continue;
-                }
-                
-                if (remaining_len < frame_length) {
-                    ESP_LOGW(TAG, "数据包不完整，声明长度: %d，实际剩余: %d", frame_length, remaining_len);
-                    // 剩余数据不足一个完整帧，跳出循环，等待下一次读取
-                    break;
-                }
-                
-               // ESP_LOGI(TAG, "协议帧 - 类型: 0x%02X, 长度: %d", frame_type, frame_length);
-                
-                if (frame_type == 0x01) {
-                    // 状态帧处理 - 注意: 此处所有对 buffer 的访问都改为 current_frame
-                    uint8_t event_type = current_frame[3];
-                    uint8_t device_type = current_frame[4];
-                    //ESP_LOGI(TAG, "状态帧 - 事件类型: 0x%02X, 设备类型: 0x%02X", event_type, device_type);
-                    
-                    if (event_type == 0x00) {
-                       // ESP_LOGI(TAG, "收到心跳数据，跳过处理");
-                    } else {
-                        const char* device_name_cn = "未知设备";
-                        switch (device_type) {
-                            case 0x01: device_name_cn = "血压计"; break;
-                            case 0x02: device_name_cn = "体温计"; break;
-                            case 0x03: device_name_cn = "血糖仪"; break;
-                            case 0x04: device_name_cn = "血氧仪"; break;
+                if (remaining_len < MIN_FRAME_LEN) break;
+
+                if (current_frame[0] == 0x55) {
+                    uint8_t frame_type = current_frame[1];
+                    uint8_t frame_length = current_frame[2];
+
+                    if (frame_length < MIN_FRAME_LEN || frame_length > remaining_len) {
+                        processed_offset++;
+                        continue;
+                    }
+
+                    // ====================== START: 状态帧处理 (已恢复) ======================
+                    if (frame_type == 0x01) {
+                                      // ====================== START: 状态帧去抖优化 ======================
+                        uint8_t event_type = current_frame[3];
+                        uint8_t device_type = current_frame[4];
+
+                        // 心跳包直接跳过
+                        if (event_type == 0x00) {
+                            ESP_LOGD(TAG, "收到心跳，跳过。");
+                            processed_offset += frame_length;
+                            continue;
                         }
-                        const char* status_cn = "状态未知";
-                        switch (event_type) {
-                            case 0x01: status_cn = "蓝牙已连接"; break;
-                            case 0x02: status_cn = "蓝牙已断开"; break;
-                        }
-                        char json_buffer[256];
-                        snprintf(json_buffer, sizeof(json_buffer), "{\"type\":\"text2speech\", \"text\":\"%s%s\"}", device_name_cn, status_cn);
-                        ESP_LOGI(TAG, "状态包JSON: %s", json_buffer);
-                        
-                        if (protocol_) {
-                            protocol_->SendCustomText(json_buffer);
-                            if (device_state_ == kDeviceStateListening) {
-                                Schedule([this]() {
-                                    aborted_ = false;
-                                    SetDeviceState(kDeviceStateSpeaking);
-                                });
+
+                        // 检查状态是否发生变化
+                        // device_last_event_state_[device_type] 如果不存在，默认值为0
+                        if (device_last_event_state_[device_type] == event_type) {
+                            // 状态未变，是重复包，直接丢弃
+                            ESP_LOGI(TAG, "接收到重复的状态帧，已忽略。");
+                        } else {
+                            // 状态发生变化，处理并更新状态
+                            device_last_event_state_[device_type] = event_type;
+
+                            const char* device_name_cn = "未知设备";
+                            // ... (设备名称 switch-case 逻辑不变) ...
+                             switch (device_type) {
+                                case 0x01: device_name_cn = "血压计"; break;
+                                case 0x02: device_name_cn = "体温计"; break;
+                                case 0x03: device_name_cn = "血糖仪"; break;
+                                case 0x04: device_name_cn = "血氧仪"; break;
+                            }
+
+                            const char* status_cn = "状态未知";
+                            // ... (状态名称 switch-case 逻辑不变) ...
+                            switch (event_type) {
+                                case 0x01: status_cn = "蓝牙已连接"; break;
+                                case 0x02: status_cn = "蓝牙已断开"; break;
+                            }
+
+                            char json_buffer[256];
+                            snprintf(json_buffer, sizeof(json_buffer), "{\"type\":\"text2speech\", \"text\":\"%s%s\"}", device_name_cn, status_cn);
+                            
+                            ESP_LOGI(TAG, "状态变化: 转发状态帧 - %s%s", device_name_cn, status_cn);
+                            if (protocol_) {
+                                protocol_->SendCustomText(json_buffer);
+                                if (device_state_ == kDeviceStateListening) {
+                                    Schedule([this]() {
+                                        aborted_ = false;
+                                        SetDeviceState(kDeviceStateSpeaking);
+                                    });
+                                }
                             }
                         }
-                    }
-                } else if (frame_type == 0x02) {
-                    // 数据帧处理 - 同样，所有对 buffer 和 length 的访问都改为 current_frame 和 frame_length
-                    int json_start = -1;
-                    int json_end = -1;
-                    
-                    for (int i = 3; i < frame_length; i++) {
-                        if (current_frame[i] == '{') {
-                            json_start = i;
-                            break;
+                        
+                    } else if (frame_type == 0x02) {
+                        // 数据帧处理
+                        int json_start = -1, json_end = -1;
+                        for (int i = 3; i < frame_length; i++) {
+                            if (current_frame[i] == '{') { json_start = i; break; }
                         }
-                    }
-                    for (int i = frame_length - 2; i >= 3; i--) { // 结束位置从帧尾部向前找
-                        if (current_frame[i] == '}') {
-                            json_end = i;
-                            break;
+                        for (int i = frame_length - 2; i >= 3; i--) {
+                            if (current_frame[i] == '}') { json_end = i; break; }
                         }
-                    }
-                    
-                    if (json_start != -1 && json_end != -1 && json_end > json_start) {
-                        int json_length = json_end - json_start + 1;
-                        char* json_string = (char*)malloc(json_length + 1);
-                        if (json_string) {
-                            memcpy(json_string, &current_frame[json_start], json_length);
-                            json_string[json_length] = '\0';
-                            ESP_LOGI(TAG, "提取的JSON数据: %s", json_string);
-                            //////////////////////////////优化血氧发送逻辑//////////////////////////////
-                            if (strstr(json_string, "\"case\":\"spo2\"") != NULL) {
-                                // 是血氧数据，执行节流逻辑
-                                int64_t current_time = esp_timer_get_time();
-                                const int64_t FIVE_SECONDS_US = 5 * 1000 * 1000;
 
-                                // 如果是第一次发送，或距离上次发送已超过5秒
-                                if (last_spo2_send_time == 0 || (current_time - last_spo2_send_time) > FIVE_SECONDS_US) {
-                                    ESP_LOGI(TAG, "血氧数据满足5秒发送间隔，准备转发...");
+                        if (json_start != -1 && json_end > json_start) {
+                            int json_length = json_end - json_start + 1;
+                            char* json_string = (char*)malloc(json_length + 1);
+                            if (json_string) {
+                                memcpy(json_string, &current_frame[json_start], json_length);
+                                json_string[json_length] = '\0';
+
+                                if (strstr(json_string, "\"case\":\"spo2\"") != NULL) {
+                                    // 血氧数据节流逻辑
+                                    int64_t current_time = esp_timer_get_time();
+                                    const int64_t FIVE_SECONDS_US = 5 * 1000 * 1000;
+
+                                    if (last_spo2_send_time == 0 || (current_time - last_spo2_send_time) > FIVE_SECONDS_US) {
+                                        ESP_LOGI(TAG, "转发血氧数据。"); // 优化日志
+                                        if (protocol_) {
+                                            protocol_->SendCustomText(json_string);
+                                        }
+                                        last_spo2_send_time = current_time;
+                                    } else {
+                                        //ESP_LOGI(TAG, "血氧数据接收频繁，本次丢弃。");
+                                    }
+                                } else {
+                                   
+                                    const char* case_start = strstr(json_string, "\"case\":\"");
+                                    char device_case[20] = "未知设备"; // 默认值
+                                    if(case_start){
+                                        sscanf(case_start + 8, "%[^\"]", device_case);
+                                    }
+                                    ESP_LOGI(TAG, "转发%s数据。", device_case); // 优化日志
+                                    
                                     if (protocol_) {
                                         protocol_->SendCustomText(json_string);
-                                        ESP_LOGI(TAG, "JSON数据已转发");
                                     }
-                                    // 更新发送时间戳
-                                    last_spo2_send_time = current_time;
-                                } else {
-                                    // 发送间隔未到，丢弃本次数据
-                                    ESP_LOGD(TAG, "血氧数据接收频繁，本次丢弃。");
                                 }
+                                free(json_string);
                             } else {
-                                // 不是血氧数据，直接转发
-                                if (protocol_) {
-                                    protocol_->SendCustomText(json_string);
-                                    ESP_LOGI(TAG, "JSON数据已转发");
-                                }
+                                ESP_LOGE(TAG, "JSON字符串内存分配失败");
                             }
-                            
-                            // if (protocol_) {
-                            //     protocol_->SendCustomText(json_string);
-                            //     ESP_LOGI(TAG, "JSON数据已转发");
-                            // }
-                            free(json_string);
-                        } else {
-                            ESP_LOGE(TAG, "JSON字符串内存分配失败");
                         }
-                    } else {
-                         ESP_LOGW(TAG, "未找到有效的JSON数据");
                     }
+                    processed_offset += frame_length;
                 } else {
-                    ESP_LOGW(TAG, "未知帧类型: 0x%02X", frame_type);
+                    processed_offset++;
                 }
-                
-                // 处理完一个帧后，将偏移量向前移动整个帧的长度
-                processed_offset += frame_length;
-
-            } else {
-                // 如果当前字节不是帧头，则跳过这个字节，继续在缓冲区中向后寻找
-               // ESP_LOGW(TAG, "在偏移量 %d 处未找到帧头0x55,跳过1字节", processed_offset);
-                processed_offset++;//
             }
         }
-       
-}
-
-// 任务延迟，避免占用过多CPU资源
-//vTaskDelay(pdMS_TO_TICKS(10));
- }
-
-// 清理资源（实际上不会执行到这里，因为是无限循环）
- free(buffer);
+    }
+    free(buffer);
 }
