@@ -57,9 +57,17 @@ private:
             // 这里可以添加其他充电状态变化时的处理逻辑
             // 例如：控制LED指示灯、调整功耗模式等
             if (is_charging) {
-                ESP_LOGI(TAG, "充电开始 - 可以在这里添加充电指示逻辑");
+                ESP_LOGI(TAG, "充电开始");
+                // *** 充电开始时打印当前ADC值 ***
+                int adc_value = power_manager_->GetBatteryAdcValue();
+                uint32_t adc_average = power_manager_->GetBatteryAdcAverage();
+                ESP_LOGI(TAG, "充电开始时电池ADC状态 - 原始值: %d, 平均值: %" PRIu32, adc_value, adc_average);
             } else {
-                ESP_LOGI(TAG, "充电停止 - 可以在这里添加断电处理逻辑");
+                ESP_LOGI(TAG, "充电停止");
+                // *** 充电停止时打印当前ADC值 ***
+                int adc_value = power_manager_->GetBatteryAdcValue();
+                uint32_t adc_average = power_manager_->GetBatteryAdcAverage();
+                ESP_LOGI(TAG, "充电停止时电池ADC状态 - 原始值: %d, 平均值: %" PRIu32, adc_value, adc_average);
             }
         });
         
