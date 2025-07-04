@@ -47,6 +47,40 @@ enum DeviceState {
 
 #define OPUS_FRAME_DURATION_MS 60
 
+/**
+ * @class Application
+ * @brief 应用程序的主类，负责管理设备的状态、事件循环、音频处理等功能。
+ *
+ * Application 类是一个单例类，用于控制和管理整个应用程序的运行。它提供了多种方法来处理设备状态、音频输入输出、事件调度等核心功能。
+ * 
+ * 核心功能包括：
+ * - 启动应用程序（Start）
+ * - 获取设备状态（GetDeviceState）
+ * - 检测语音（IsVoiceDetected）
+ * - 调度任务（Schedule）
+ * - 设置设备状态（SetDeviceState）
+ * - 弹出警报（Alert）
+ * - 取消警报（DismissAlert）
+ * - 中止语音播放（AbortSpeaking）
+ * - 切换聊天状态（ToggleChatState）
+ * - 更改聊天状态（ChangeChatState）
+ * - 开始监听（StartListening）
+ * - 停止监听（StopListening）
+ * - 更新物联网状态（UpdateIotStates）
+ * - 重启设备（Reboot）
+ * - 唤醒词触发（WakeWordInvoke）
+ * - 播放声音（PlaySound）
+ * - 检查是否可以进入休眠模式（CanEnterSleepMode）
+ * 
+ * 使用示例：
+ * 
+ * 构造函数参数：
+ * 无（私有构造函数，仅通过GetInstance方法获取实例）
+ * 
+ * 特殊使用限制或潜在的副作用：
+ * - 该类为单例模式，不可拷贝或赋值。
+ * - 在多线程环境下使用时，需要注意线程安全。
+ */
 class Application {
 public:
     static Application& GetInstance() {

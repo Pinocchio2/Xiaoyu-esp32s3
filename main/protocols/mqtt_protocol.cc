@@ -12,18 +12,24 @@
 
 #define TAG "MQTT"
 
+// 构造函数，创建一个事件组
 MqttProtocol::MqttProtocol() {
+    // 创建一个事件组
     event_group_handle_ = xEventGroupCreate();
 }
 
 MqttProtocol::~MqttProtocol() {
+    // 打印日志信息
     ESP_LOGI(TAG, "MqttProtocol deinit");
+    // 如果udp_不为空，则删除
     if (udp_ != nullptr) {
         delete udp_;
     }
+    // 如果mqtt_不为空，则删除
     if (mqtt_ != nullptr) {
         delete mqtt_;
     }
+    // 删除事件组
     vEventGroupDelete(event_group_handle_);
 }
 
@@ -32,11 +38,13 @@ void MqttProtocol::Start() {
 }
 
 bool MqttProtocol::StartMqttClient(bool report_error) {
+    // 如果mqtt_不为空，则删除
     if (mqtt_ != nullptr) {
         ESP_LOGW(TAG, "Mqtt client already started");
         delete mqtt_;
     }
 
+    // 从设置中获取mqtt的相关信息
     Settings settings("mqtt", false);
     endpoint_ = settings.GetString("endpoint");
     client_id_ = settings.GetString("client_id");
@@ -44,6 +52,7 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
     password_ = settings.GetString("password");
     publish_topic_ = settings.GetString("publish_topic");
 
+    // 如果endpoint_为空，则返回false
     if (endpoint_.empty()) {
         ESP_LOGW(TAG, "MQTT endpoint is not specified");
         if (report_error) {
@@ -52,13 +61,16 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
         return false;
     }
 
+    // 创建mqtt对象
     mqtt_ = Board::GetInstance().CreateMqtt();
     mqtt_->SetKeepAlive(90);
 
+    // 设置mqtt断开连接时的回调函数
     mqtt_->OnDisconnected([this]() {
         ESP_LOGI(TAG, "Disconnected from endpoint");
     });
 
+    // 设置mqtt接收到消息时的回调函数
     mqtt_->OnMessage([this](const std::string& topic, const std::string& payload) {
         cJSON* root = cJSON_Parse(payload.c_str());
         if (root == nullptr) {
@@ -72,16 +84,20 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
             return;
         }
 
+        // 如果消息类型为hello，则解析服务器hello消息
         if (strcmp(type->valuestring, "hello") == 0) {
             ParseServerHello(root);
+        // 如果消息类型为goodbye，则处理服务器goodbye消息
         } else if (strcmp(type->valuestring, "goodbye") == 0) {
             auto session_id = cJSON_GetObjectItem(root, "session_id");
             ESP_LOGI(TAG, "Received goodbye message, session_id: %s", session_id ? session_id->valuestring : "null");
+            // 如果session_id为空或者session_id_等于session_id，则关闭音频通道
             if (session_id == nullptr || session_id_ == session_id->valuestring) {
                 Application::GetInstance().Schedule([this]() {
                     CloseAudioChannel();
                 });
             }
+        // 如果有自定义的回调函数，则调用回调函数
         } else if (on_incoming_json_ != nullptr) {
             on_incoming_json_(root);
         }
@@ -89,10 +105,16 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
         last_incoming_time_ = std::chrono::steady_clock::now();
     });
 
+    // 连接到endpoint_
+    // 打印连接到端点的信息
     ESP_LOGI(TAG, "Connecting to endpoint %s", endpoint_.c_str());
+    // 如果连接失败
     if (!mqtt_->Connect(endpoint_, 8883, client_id_, username_, password_)) {
+        // 打印连接失败的信息
         ESP_LOGE(TAG, "Failed to connect to endpoint");
+        // 设置错误信息
         SetError(Lang::Strings::SERVER_NOT_CONNECTED);
+        // 返回false
         return false;
     }
 
@@ -100,60 +122,83 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
     return true;
 }
 
+// 发送文本消息
 bool MqttProtocol::SendText(const std::string& text) {
+    // 如果发布主题为空，则返回false
     if (publish_topic_.empty()) {
         return false;
     }
+    // 如果发布消息失败，则记录错误日志，并设置错误信息，返回false
     if (!mqtt_->Publish(publish_topic_, text)) {
         ESP_LOGE(TAG, "Failed to publish message: %s", text.c_str());
         SetError(Lang::Strings::SERVER_ERROR);
         return false;
     }
+    // 发布消息成功，返回true
     return true;
 }
 
 void MqttProtocol::SendAudio(const std::vector<uint8_t>& data) {
+    // 加锁，防止多线程同时操作
     std::lock_guard<std::mutex> lock(channel_mutex_);
+    // 如果udp_为空，则直接返回
     if (udp_ == nullptr) {
         return;
     }
 
+    // 生成随机数
     std::string nonce(aes_nonce_);
+    // 将数据大小写入随机数
     *(uint16_t*)&nonce[2] = htons(data.size());
+    // 将本地序列号写入随机数
     *(uint32_t*)&nonce[12] = htonl(++local_sequence_);
 
+    // 生成加密后的数据
     std::string encrypted;
     encrypted.resize(aes_nonce_.size() + data.size());
+    // 将随机数复制到加密数据中
     memcpy(encrypted.data(), nonce.data(), nonce.size());
 
+    // 初始化计数器
     size_t nc_off = 0;
+    // 初始化流块
     uint8_t stream_block[16] = {0};
+    // 使用CTR模式加密数据
     if (mbedtls_aes_crypt_ctr(&aes_ctx_, data.size(), &nc_off, (uint8_t*)nonce.c_str(), stream_block,
         (uint8_t*)data.data(), (uint8_t*)&encrypted[nonce.size()]) != 0) {
+        // 如果加密失败，则输出错误信息
         ESP_LOGE(TAG, "Failed to encrypt audio data");
         return;
     }
 
+    // 设置正在发送音频标志
     busy_sending_audio_ = true;
+    // 发送加密后的数据
     udp_->Send(encrypted);
+    // 清除正在发送音频标志
     busy_sending_audio_ = false;
 }
 
 void MqttProtocol::CloseAudioChannel() {
+    // 加锁，防止多线程同时操作udp_指针
     {
         std::lock_guard<std::mutex> lock(channel_mutex_);
+        // 如果udp_指针不为空，则释放内存
         if (udp_ != nullptr) {
             delete udp_;
             udp_ = nullptr;
         }
     }
 
+    // 构造消息内容
     std::string message = "{";
     message += "\"session_id\":\"" + session_id_ + "\",";
     message += "\"type\":\"goodbye\"";
     message += "}";
+    // 发送消息
     SendText(message);
 
+    // 如果on_audio_channel_closed_不为空，则调用回调函数
     if (on_audio_channel_closed_ != nullptr) {
         on_audio_channel_closed_();
     }

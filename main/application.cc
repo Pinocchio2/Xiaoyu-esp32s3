@@ -415,10 +415,10 @@ void Application::Start() {
         vTaskDelete(NULL);
     }, "audio_loop", 4096 * 2, this, 8, &audio_loop_task_handle_, realtime_chat_enabled_ ? 1 : 0);
 
-    /* Wait for the network to be ready */
+    
     board.StartNetwork();
 
-    // Check for new firmware version or get the MQTT broker address
+    
     CheckNewVersion();
 
     // Initialize the protocol
