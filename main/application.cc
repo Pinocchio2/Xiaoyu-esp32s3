@@ -33,149 +33,281 @@ static const char* const STATE_STRINGS[] = {
     "invalid_state"
 };
 
+// [函数定义] Application 类的构造函数。
+// 当通过 Application::GetInstance() 首次创建类的唯一实例时，此函数被自动调用。
+// [设计思想] 这个构造函数是 RAII (Resource Acquisition Is Initialization，资源获取即初始化) 思想的绝佳体现。
+// 它的核心职责是：为新创建的对象申请并配置好所有必需的系统资源。
 Application::Application() {
+    // [资源获取 - FreeRTOS 事件组]
+    // 调用 FreeRTOS 的 API `xEventGroupCreate` 来创建一个“事件组”。
+    // 事件组是 FreeRTOS 中用于任务间同步和通信的强大工具。
+    // API 返回一个类型为 `EventGroupHandle_t` 的句柄(Handle)，它相当于操作系统内部该资源的“身份证”。
+    // 我们将这个句柄保存在成员变量 `event_group_` 中，以便在对象的整个生命周期内使用。
     event_group_ = xEventGroupCreate();
+
+    // [资源获取 - C++ 动态内存]
+    // 使用 C++ 的 `new` 关键字在堆(heap)内存上动态地创建一个 `BackgroundTask` 对象。
+    // 参数 `4096 * 8` (即 32768) 很可能是传递给 `BackgroundTask` 构造函数的、其内部封装的 FreeRTOS 任务所需的“任务栈大小”(Stack Size)。
+    // 注意：`new` 返回的是一个裸指针(`BackgroundTask*`)。这意味着我们必须在析构函数 `~Application()` 中手动调用 `delete` 来释放这块内存，以防止内存泄漏。
     background_task_ = new BackgroundTask(4096 * 8);
 
+    // [资源配置 - ESP-IDF 定时器]
+    // 定义一个 `esp_timer_create_args_t` 类型的结构体，用于配置即将创建的定时器。
+    // 这里使用了 C99 的“指定初始化器” (Designated Initializer) 语法（`.成员名 = 值`），
+    // 这种语法在嵌入式开发中非常流行，因为它可读性强，且不依赖于结构体成员的顺序。
     esp_timer_create_args_t clock_timer_args = {
+        // [核心语法点] C++11 Lambda 表达式作为 C 风格回调函数。
+        // `.callback` 成员需要一个 C 语言函数指针 `void (*)(void*)`。
+        // 这个无捕获 `[]` 的 Lambda 可以被隐式转换为此函数指针类型，是连接 C++ 代码和 C 库 API 的标准“桥梁模式”。
         .callback = [](void* arg) {
-            Application* app = (Application*)arg;
+            // 在回调函数内部，将通用的 `void*` 参数安全地、显式地转换回其原始的 `Application*` 类型。
+            Application* app = static_cast<Application*>(arg);
+            // 通过转换后的指针，调用对象的成员函数。
             app->OnClockTimer();
         },
+        // [核心语法点] `this` 指针作为回调参数。
+        // `this` 是一个指向当前 `Application` 对象实例的指针。
+        // 将它赋值给 `.arg`，意味着当定时器触发、回调函数被调用时，`this` 的值会被传入 `arg` 参数。
+        // 这使得上面那个静态的 Lambda 回调函数在被触发时，能准确地知道要操作哪一个对象实例。
         .arg = this,
+        // [ESP-IDF 特定配置]
+        // ESP_TIMER_TASK 表示回调函数将在一个专用的高优先级“定时器任务”中执行，而不是在中断(ISR)中。
+        // 这允许在回调中使用更多样的 FreeRTOS API。
         .dispatch_method = ESP_TIMER_TASK,
+        // 为定时器命名，主要用于调试目的。
         .name = "clock_timer",
+        // 一个优化选项，如果事件队列满了，则跳过未处理的事件。
         .skip_unhandled_events = true
     };
+    
+    // [资源获取 - ESP-IDF 定时器]
+    // 调用 `esp_timer_create` API，传入配置结构体和用于接收句柄的变量地址。
+    // API 执行后，`clock_timer_handle_` 成员变量将保存这个新创建的定时器的句柄。
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+    
+    // [启动资源]
+    // 调用 `esp_timer_start_periodic` API 来启动定时器。
+    // `clock_timer_handle_` 是要启动的定时器。
+    // `1000000` 是定时周期，单位为微秒 (microseconds)。1,000,000 微秒 = 1 秒。
+    // 这行代码的效果是：每隔 1 秒，上面定义的 Lambda 回调函数就会被自动执行一次。
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
-}
-
+} // 构造函数结束，Application 对象已完成初始化，所有资源已准备就绪。
+// [函数定义] Application 类的析构函数。
+// [核心职责] 它的唯一职责是“释放资源”，与构造函数中“获取资源”的行为一一对应。
+// 这是 RAII (资源获取即初始化) 设计思想的后半部分，也是最关键的部分。
+// 当 Application 的唯一实例在程序结束时被销毁，此函数会自动被调用，确保不会有任何资源泄漏。
 Application::~Application() {
+    // [资源释放 - ESP-IDF 定时器]
+    // [健壮性检查] 在尝试停止或删除任何系统资源之前，必须检查其句柄是否为 `nullptr`。
+    // 如果在构造函数中资源创建失败，句柄就会是 `nullptr`，这个检查可以防止程序因操作无效句柄而崩溃。
     if (clock_timer_handle_ != nullptr) {
+        // 1. 调用 `esp_timer_stop` API，安全地停止定时器，确保它不再触发回调。
         esp_timer_stop(clock_timer_handle_);
+        // 2. 调用 `esp_timer_delete` API，彻底删除定时器对象，释放其占用的所有内存和系统资源。
         esp_timer_delete(clock_timer_handle_);
     }
+
+    // [资源释放 - C++ 动态内存]
+    // [健壮性检查] 同样，在 `delete` 一个指针前，检查它是否为 `nullptr` 是一个好习惯。
+    // (虽然对 `nullptr` 调用 `delete` 本身是安全的、无操作的，但显式检查能让代码意图更清晰)。
     if (background_task_ != nullptr) {
+        // [语法点] `delete` 关键字。
+        // `delete` 用于释放由 `new` 关键字在堆(heap)上分配的内存。
+        // 它会首先调用 `background_task_` 所指向对象的析构函数（执行该对象的内部清理），
+        // 然后再释放对象本身占用的内存。
         delete background_task_;
     }
+
+    // [资源释放 - FreeRTOS 事件组]
+    // 调用 FreeRTOS 的 API `vEventGroupDelete`，传入之前创建的事件组句柄。
+    // 此函数会删除事件组，并释放其占用的内核资源。
+    // 注意：这里没有 `if` 检查，意味着代码假定 `event_group_` 总是有效的。
+    // 一个更健壮的实现也会在这里加上 `if (event_group_ != nullptr)` 的检查。
     vEventGroupDelete(event_group_);
-}
+} // 析构函数结束，所有 Application 对象持有的资源均已被安全释放。
 
+// [函数定义] Application 类的成员函数 CheckNewVersion。
+// [核心职责] 此函数负责在设备启动时，完成版本检查、固件升级(OTA)以及设备激活这三大关键流程。
+// 这是一个阻塞式的、具有复杂流程控制的函数，是设备上线前的“看门人”。
 void Application::CheckNewVersion() {
-    const int MAX_RETRY = 10;
-    int retry_count = 0;
-    int retry_delay = 10; // 初始重试延迟为10秒
+    // [初始化] 定义重试逻辑所需的常量和变量。
+    const int MAX_RETRY = 10; // 最大重试次数，避免无限重试。
+    int retry_count = 0;      // 当前重试次数计数器。
+    int retry_delay = 10;     // 初始重试延迟时间，单位为秒。
 
+    // [流程控制] 使用一个无限循环 `while (true)` 来包裹整个检查和激活流程。
+    // 只有当所有步骤（版本检查、可选的激活）都完成后，才会通过 `break` 语句退出循环。
     while (true) {
+        // [状态变更] 无论循环多少次，每次开始都先将设备状态设置为“激活中”。
         SetDeviceState(kDeviceStateActivating);
+        // [语法点] `auto` 关键字
+        // 编译器会自动推断 `display` 的类型为 `Display*`，让代码更简洁。
+        // 这里通过单例模式获取到显示对象的指针。
         auto display = Board::GetInstance().GetDisplay();
-        display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+        display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION); // 更新UI，告知用户正在检查新版本。
 
+        // [网络操作 & 重试逻辑]
+        // 尝试调用 ota_ 对象的 CheckVersion 方法，这很可能是一个发起网络请求的操作。
         if (!ota_.CheckVersion()) {
+            // 如果检查失败，则进入重试流程。
             retry_count++;
             if (retry_count >= MAX_RETRY) {
+                // 如果达到最大重试次数，则记录错误日志并放弃，直接从函数返回。
                 ESP_LOGE(TAG, "Too many retries, exit version check");
                 return;
             }
+            // 记录警告日志，告知当前的重试状态。
             ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", retry_delay, retry_count, MAX_RETRY);
+            
+            // [FreeRTOS API] 使用 for 循环和 `vTaskDelay` 实现非阻塞式等待。
+            // `vTaskDelay` 会使当前任务进入阻塞状态，让出CPU给其他任务，非常高效。
+            // `pdMS_TO_TICKS(1000)` 是一个宏，将1000毫秒转换为FreeRTOS内部的时间节拍数(ticks)。
             for (int i = 0; i < retry_delay; i++) {
                 vTaskDelay(pdMS_TO_TICKS(1000));
+                // 在等待期间，如果设备状态被其他任务改变为空闲状态，则提前结束等待。
                 if (device_state_ == kDeviceStateIdle) {
                     break;
                 }
             }
-            retry_delay *= 2; // 每次重试后延迟时间翻倍
+
+            // [设计模式] 指数退避 (Exponential Backoff)。
+            // 每次重试失败后，将等待时间加倍。这是一种非常成熟的网络编程策略，
+            // 它可以避免在服务器端出现问题时，客户端以过于频繁的请求“攻击”服务器。
+            retry_delay *= 2; 
+            
+            // `continue` 关键字会立即结束本次循环，并跳转到 `while(true)` 的下一次循环的开始处，重新尝试检查版本。
             continue;
         }
+        
+        // 如果 `ota_.CheckVersion()` 成功，则重置重试计数器和延迟时间，为后续可能的其他失败做准备。
         retry_count = 0;
-        retry_delay = 10; // 重置重试延迟时间
+        retry_delay = 10;
 
+        // [OTA 升级流程]
+        // 检查是否有新版本可用。
         if (ota_.HasNewVersion()) {
+            // 通过声音和UI提示用户即将开始升级。
             Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "happy", Lang::Sounds::P3_UPGRADE);
-
-            vTaskDelay(pdMS_TO_TICKS(3000));
-
-            SetDeviceState(kDeviceStateUpgrading);
+            vTaskDelay(pdMS_TO_TICKS(3000)); // 等待3秒，让用户有时间看到提示。
+            SetDeviceState(kDeviceStateUpgrading); // 将设备状态切换为“升级中”。
             
+            // --- [关键步骤] OTA 升级前的准备与清理工作 ---
+            // 为了保证 OTA 这个关键过程的稳定性，必须将系统置于一个已知的、最简单的状态。
             display->SetIcon(FONT_AWESOME_DOWNLOAD);
             std::string message = std::string(Lang::Strings::NEW_VERSION) + ota_.GetFirmwareVersion();
             display->SetChatMessage("system", message.c_str());
 
             auto& board = Board::GetInstance();
-            board.SetPowerSaveMode(false);
+            // 1. 禁用省电模式，确保升级期间芯片全速运行，网络稳定。
+            board.SetPowerSaveMode(false); 
 #if CONFIG_USE_WAKE_WORD_DETECT
+            // 2. 停止唤醒词检测任务，释放其占用的音频等资源。
             wake_word_detect_.StopDetection();
 #endif
-            // 预先关闭音频输出，避免升级过程有音频操作
+            // 3. 彻底关闭音频输入输出，避免任何音频操作干扰升级。
             auto codec = board.GetAudioCodec();
             codec->EnableInput(false);
             codec->EnableOutput(false);
+            
+            // 4. 清理共享数据队列，并确保后台任务已完全停止。
             {
+                // [语法点] `std::lock_guard` RAII风格的互斥锁。
+                // 在进入这个代码块时自动锁定 `mutex_`，在退出时（右花括号）自动解锁。
+                // 保证了对共享资源 `audio_decode_queue_` 的访问是线程安全的。
                 std::lock_guard<std::mutex> lock(mutex_);
                 audio_decode_queue_.clear();
             }
-            background_task_->WaitForCompletion();
-            delete background_task_;
-            background_task_ = nullptr;
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            background_task_->WaitForCompletion(); // 等待后台任务队列中所有任务执行完毕。
+            delete background_task_;              // 删除后台任务对象，释放其资源。
+            background_task_ = nullptr;          // 删除后将指针设为 nullptr，防止悬挂指针。
+            vTaskDelay(pdMS_TO_TICKS(1000));     // 短暂延时，确保系统状态稳定。
 
+            // [核心操作] 启动 OTA 升级。
+            // `ota_.StartUpgrade` 接受一个回调函数（Lambda表达式），用于在升级过程中报告进度。
+            // [语法点] Lambda 捕获列表 `[display]`。
+            // 它将外部的 `display` 变量“捕获”到 Lambda 内部使用。
+            // 默认是按值捕获，相当于在 Lambda 内部拥有了一个 `display` 的副本，可以在回调中安全地更新UI。
             ota_.StartUpgrade([display](int progress, size_t speed) {
                 char buffer[64];
+                // `snprintf` 是一个安全的字符串格式化函数，它会防止缓冲区溢出。
                 snprintf(buffer, sizeof(buffer), "%d%% %zuKB/s", progress, speed / 1024);
                 display->SetChatMessage("system", buffer);
             });
 
-            // If upgrade success, the device will reboot and never reach here
+            // [流程控制] 正常情况下，`ota_.StartUpgrade` 成功后会直接重启设备，代码不会执行到这里。
+            // 如果执行到这里，说明升级失败了。
             display->SetStatus(Lang::Strings::UPGRADE_FAILED);
             ESP_LOGI(TAG, "Firmware upgrade failed...");
             vTaskDelay(pdMS_TO_TICKS(3000));
-            Reboot();
-            return;
+            Reboot(); // 重启设备。
+            return;   // 结束函数。
         }
 
-        // No new version, mark the current version as valid
+        // [设备激活流程]
+        // 如果没有新版本，则标记当前运行的固件版本是有效的。
         ota_.MarkCurrentVersionValid();
+        
+        // 如果服务器没有返回激活码信息，说明设备无需激活。
         if (!ota_.HasActivationCode() && !ota_.HasActivationChallenge()) {
+            // [FreeRTOS API] 设置事件位，通知其他可能正在等待的任务（如此处的`Start`函数）本流程已完成。
             xEventGroupSetBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT);
-            // Exit the loop if done checking new version
+            // `break` 退出 `while(true)` 循环，函数执行完毕。
             break;
         }
 
+        // 如果需要激活，则更新UI并调用 `ShowActivationCode` 进行播报。
         display->SetStatus(Lang::Strings::ACTIVATION);
-        // Activation code is shown to the user and waiting for the user to input
         if (ota_.HasActivationCode()) {
             ShowActivationCode();
         }
 
-        // This will block the loop until the activation is done or timeout
+        // [流程控制] 轮询激活状态。
+        // 使用一个 `for` 循环尝试激活设备，最多10次。
         for (int i = 0; i < 10; ++i) {
             ESP_LOGI(TAG, "Activating... %d/%d", i + 1, 10);
-            esp_err_t err = ota_.Activate();
-            if (err == ESP_OK) {
-                xEventGroupSetBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT);
-                break;
-            } else if (err == ESP_ERR_TIMEOUT) {
-                vTaskDelay(pdMS_TO_TICKS(3000));
-            } else {
-                vTaskDelay(pdMS_TO_TICKS(10000));
+            esp_err_t err = ota_.Activate(); // 这是一个阻塞式的网络请求。
+            if (err == ESP_OK) { // 如果成功
+                xEventGroupSetBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT); // 设置完成事件
+                break; // 退出激活循环
+            } else if (err == ESP_ERR_TIMEOUT) { // 如果是超时错误
+                vTaskDelay(pdMS_TO_TICKS(3000)); // 等待3秒再试
+            } else { // 其他错误
+                vTaskDelay(pdMS_TO_TICKS(10000)); // 等待10秒再试
             }
-            if (device_state_ == kDeviceStateIdle) {
+            if (device_state_ == kDeviceStateIdle) { // 同样提供一个外部中断的出口
                 break;
             }
         }
-    }
-}
+    } // while(true) 循环结束
+} // CheckNewVersion 函数结束
 
+// [函数定义] Application 类的成员函数 ShowActivationCode。
+// [核心职责] 以用户友好的方式（UI显示 + 语音播报）来呈现设备激活码。
 void Application::ShowActivationCode() {
+    // [语法点] `auto&` (带引用的类型推导)
+    // `auto` 会让编译器自动推断变量类型（这里是 std::string）。
+    // `&` 表示 `message` 和 `code` 是“引用”(Reference)，而不是副本(Copy)。
+    // 这意味着它们直接指向 ota_ 对象内部的原始字符串数据，避免了不必要的内存分配和字符串拷贝，非常高效。
     auto& message = ota_.GetActivationMessage();
     auto& code = ota_.GetActivationCode();
 
+    // [语法点] 局部结构体 (Local Struct)
+    // 在函数内部定义一个结构体，其作用域仅限于此函数。
+    // 这是一种很好的封装实践，当一个数据结构只为某个特定函数服务时，可以避免污染类或全局的命名空间。
     struct digit_sound {
         char digit;
+        // `std::string_view` 是一个非拥有的字符串“视图”，它只包含一个指针和长度。
+        // 在这里使用 `const std::string_view&` 同样是为了效率，避免任何字符串拷贝。
         const std::string_view& sound;
     };
+
+    // [语法点] 静态常量 `std::array` (Static Constant std::array)
+    // `static` 关键字是这里的关键性能优化：它确保 `digit_sounds` 这个查找表只在程序第一次调用此函数时被创建和初始化一次。
+    // 后续所有对 ShowActivationCode 的调用都会直接复用这个已存在的数组，避免了重复创建的开销。
+    // `const` 确保这个查找表在初始化后不能被修改。
+    // `std::array<T, N>` 是一个C++11的容器，它封装了一个固定大小的C风格数组，但提供了迭代器等现代接口，更安全易用。
     static const std::array<digit_sound, 10> digit_sounds{{
+        // 使用聚合初始化(Aggregate Initialization)来填充数组。
         digit_sound{'0', Lang::Sounds::P3_0},
         digit_sound{'1', Lang::Sounds::P3_1}, 
         digit_sound{'2', Lang::Sounds::P3_2},
@@ -188,17 +320,35 @@ void Application::ShowActivationCode() {
         digit_sound{'9', Lang::Sounds::P3_9}
     }};
 
-    // This sentence uses 9KB of SRAM, so we need to wait for it to finish
+    // 调用 Alert 函数，这个函数负责在屏幕上显示消息，并播放一个整体的提示音（如“请输入激活码”）。
+    // `message.c_str()` 将 `std::string` 转换为C风格的 `const char*` 指针，以兼容可能需要C字符串的API。
     Alert(Lang::Strings::ACTIVATION, message.c_str(), "happy", Lang::Sounds::P3_ACTIVATION);
 
+    // [语法点] 基于范围的 for 循环 (Range-based for loop)
+    // 这是 C++11 引入的遍历容器的现代化、更安全的方式。它会自动处理迭代器和边界，代码更简洁。
+    // `const auto& digit`：对于 `code` 字符串中的每一个字符，创建一个名为 `digit` 的常量引用。
     for (const auto& digit : code) {
+        // [语法点] `std::find_if` 算法和 Lambda 谓词
+        // `std::find_if` 是C++标准库中的一个算法，它在指定范围 (`digit_sounds.begin()` 到 `digit_sounds.end()`)
+        // 中查找第一个满足特定条件的元素。
+        // 第三个参数是一个返回布尔值的“谓词”(Predicate)，这里我们用一个 Lambda 表达式来定义它。
         auto it = std::find_if(digit_sounds.begin(), digit_sounds.end(),
+            // [语法点] Lambda 捕获列表 `[digit]`
+            // 这个 Lambda 需要比较来自外部 for 循环的 `digit` 变量。
+            // `[digit]` 按值“捕获”了 `digit` 变量，使得它在 Lambda 函数体内部可见并可用。
+            // `(const digit_sound& ds)` 是 Lambda 的参数，`ds` 代表 `digit_sounds` 中正在被检查的那个元素。
             [digit](const digit_sound& ds) { return ds.digit == digit; });
+        
+        // `std::find_if` 在找到元素时返回一个指向该元素的迭代器；如果没找到，则返回容器的 `end()` 迭代器。
+        // 因此，`it != digit_sounds.end()` 是检查是否查找成功的标准方法。
         if (it != digit_sounds.end()) {
+            // 如果找到了，`it` 就是一个有效的迭代器。
+            // `it->sound` 使用箭头运算符 `->` 来访问迭代器所指向的 `digit_sound` 对象的 `sound` 成员。
+            // 然后调用 PlaySound 函数，将对应的声音播放出来。
             PlaySound(it->sound);
         }
     }
-}
+} // 函数结束，激活码已显示并播报完毕。
 
 void Application::Alert(const char* status, const char* message, const char* emotion, const std::string_view& sound) {
     ESP_LOGW(TAG, "Alert %s: %s [%s]", status, message, emotion);
@@ -369,31 +519,42 @@ void Application::StopListening() {
 }
 
 void Application::Start() {
+    // 获取板子实例
     auto& board = Board::GetInstance();
+    // 设置设备状态为启动中
     SetDeviceState(kDeviceStateStarting);
 
-    /* Setup the display */
+    
+    // 获取显示实例
     auto display = board.GetDisplay();
 
-    /* Setup the audio codec */
+   
+    // 获取音频编解码器实例
     auto codec = board.GetAudioCodec();
+    // 创建opus解码器实例
     opus_decoder_ = std::make_unique<OpusDecoderWrapper>(codec->output_sample_rate(), 1, OPUS_FRAME_DURATION_MS);
+    // 创建opus编码器实例
     opus_encoder_ = std::make_unique<OpusEncoderWrapper>(16000, 1, OPUS_FRAME_DURATION_MS);
+    // 如果实时聊天启用，设置opus编码器复杂度为0
     if (realtime_chat_enabled_) {
         ESP_LOGI(TAG, "Realtime chat enabled, setting opus encoder complexity to 0");
         opus_encoder_->SetComplexity(0);
+    // 如果是ml307板子，设置opus编码器复杂度为5
     } else if (board.GetBoardType() == "ml307") {
         ESP_LOGI(TAG, "ML307 board detected, setting opus encoder complexity to 5");
         opus_encoder_->SetComplexity(5);
+    // 否则，设置opus编码器复杂度为3
     } else {
         ESP_LOGI(TAG, "WiFi board detected, setting opus encoder complexity to 3");
         opus_encoder_->SetComplexity(3);
     }
 
+    // 如果输入采样率不是16000，配置输入重采样器和参考重采样器
     if (codec->input_sample_rate() != 16000) {
         input_resampler_.Configure(codec->input_sample_rate(), 16000);
         reference_resampler_.Configure(codec->input_sample_rate(), 16000);
     }
+    // 启动音频编解码器
     codec->Start();
 
     // 启动串口监听任务
@@ -408,7 +569,7 @@ void Application::Start() {
         &uart_listen_task_handle_, // 任务句柄
         1                    // 运行在核心1
     );
-
+    // 创建音频循环任务
     xTaskCreatePinnedToCore([](void* arg) {
         Application* app = (Application*)arg;
         app->AudioLoop();
@@ -416,22 +577,27 @@ void Application::Start() {
     }, "audio_loop", 4096 * 2, this, 8, &audio_loop_task_handle_, realtime_chat_enabled_ ? 1 : 0);
 
     
+    // 启动网络
     board.StartNetwork();
 
     
+    // 检查新版本
     CheckNewVersion();
 
-    // Initialize the protocol
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 #ifdef CONFIG_CONNECTION_TYPE_WEBSOCKET
+    // 如果配置了WEBSOCKET连接类型，则创建一个WebsocketProtocol对象
     protocol_ = std::make_unique<WebsocketProtocol>();
 #else
+    // 否则创建一个MqttProtocol对象
     protocol_ = std::make_unique<MqttProtocol>();
 #endif
+    // 注册网络错误回调函数
     protocol_->OnNetworkError([this](const std::string& message) {
         SetDeviceState(kDeviceStateIdle);
         Alert(Lang::Strings::ERROR, message.c_str(), "sad", Lang::Sounds::P3_EXCLAMATION);
     });
+    // 注册音频数据回调函数
     protocol_->OnIncomingAudio([this](std::vector<uint8_t>&& data) {
         const int max_packets_in_queue = 300 / OPUS_FRAME_DURATION_MS;
         std::lock_guard<std::mutex> lock(mutex_);
@@ -439,6 +605,7 @@ void Application::Start() {
             audio_decode_queue_.emplace_back(std::move(data));
         }
     });
+    // 注册音频通道打开回调函数
     protocol_->OnAudioChannelOpened([this, codec, &board]() {
         board.SetPowerSaveMode(false);
         if (protocol_->server_sample_rate() != codec->output_sample_rate()) {
@@ -455,6 +622,7 @@ void Application::Start() {
     
 
     });
+    // 注册音频通道关闭回调函数
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveMode(true);
         Schedule([this]() {
@@ -463,6 +631,7 @@ void Application::Start() {
             SetDeviceState(kDeviceStateIdle);
         });
     });
+    // 注册JSON数据回调函数
     protocol_->OnIncomingJson([this, display](const cJSON* root) {
         // Parse JSON data
         auto type = cJSON_GetObjectItem(root, "type");

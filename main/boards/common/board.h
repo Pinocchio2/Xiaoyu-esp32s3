@@ -10,6 +10,7 @@
 #include "led/led.h"
 #include "backlight.h"
 
+// 创建棋盘
 void* create_board();
 // 声明一个名为AudioCodec的类
 class AudioCodec;
@@ -42,8 +43,8 @@ class Display;
  */
 class Board {
 private:
-    Board(const Board&) = delete; // 禁用拷贝构造函数
-    Board& operator=(const Board&) = delete; // 禁用赋值操作
+    Board(const Board&) = delete;// 禁用拷贝构造函数
+    Board& operator=(const Board&) = delete;// 禁用赋值操作
     //virtual std::string GetBoardJson() = 0;
 
 protected:
@@ -54,12 +55,17 @@ protected:
     std::string uuid_;
 
 public:
-    // 获取单例对象
-    static Board& GetInstance() {
-        static Board* instance = static_cast<Board*>(create_board());
-        return *instance;
-    }
-
+    // 获取单例对象// 定义一个静态方法来获取 Board 类的唯一实例
+    //静态对象可以通过类名直接调用，而不需要创建类的实例
+static Board& GetInstance() {
+    // 静态局部变量，用于存储 Board 类的唯一实例
+    // 在第一次调用 GetInstance 时初始化，并且是线程安全的
+    static Board* instance = static_cast<Board*>(create_board());
+    
+    // 返回 instance 指针指向的 Board 对象的引用
+    return *instance;
+}
+ 
     // 虚析构函数
     virtual ~Board() = default;
     // 获取板子类型
@@ -96,10 +102,9 @@ public:
     virtual std::string GetBoardJson() = 0;///////新增////////
 };
 
-#define DECLARE_BOARD(BOARD_CLASS_NAME) \
-void* create_board() { \
-    // 创建一个BOARD_CLASS_NAME类的实例，并返回其指针
-    return new BOARD_CLASS_NAME(); \
+#define DECLARE_BOARD(BOARD_CLASS_NAME)\
+void* create_board(){ \
+    return new BOARD_CLASS_NAME();  \
 }
 
 #endif // BOARD_H
