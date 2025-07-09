@@ -23,21 +23,266 @@
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
 
 
-#define DISPLAY_TYPE_OLED
-#define DISPLAY_WIDTH   128
-#define DISPLAY_HEIGHT  64
-#define DISPLAY_MIRROR_X false // Adjust as needed for your OLED
-#define DISPLAY_MIRROR_Y false // Adjust as needed for your OLED
-#define DISPLAY_SWAP_XY false  // Adjust as needed for your OLED
+// #define DISPLAY_TYPE_OLED
+// #define DISPLAY_WIDTH   128
+// #define DISPLAY_HEIGHT  64
+// #define DISPLAY_MIRROR_X false // Adjust as needed for your OLED
+// #define DISPLAY_MIRROR_Y false // Adjust as needed for your OLED
+// #define DISPLAY_SWAP_XY false  // Adjust as needed for your OLED
 
-#define DISPLAY_OFFSET_X  0
-#define DISPLAY_OFFSET_Y  0
+// #define DISPLAY_OFFSET_X  0
+// #define DISPLAY_OFFSET_Y  0
 
 // I2C pins for OLED (shared with audio codec)
-#define DISPLAY_I2C_SDA_PIN  AUDIO_CODEC_I2C_SDA_PIN // GPIO_NUM_1
-#define DISPLAY_I2C_SCL_PIN  AUDIO_CODEC_I2C_SCL_PIN // GPIO_NUM_2
-#define DISPLAY_I2C_ADDR     0x3C // Common OLED I2C address, verify for your module (0x3C or 0x3D)
-// #define DISPLAY_RESET_PIN    GPIO_NUM_18 // Optional: Define if your OLED has a RESET pin and you want to use it
+// #define DISPLAY_I2C_SDA_PIN  AUDIO_CODEC_I2C_SDA_PIN // GPIO_NUM_1
+// #define DISPLAY_I2C_SCL_PIN  AUDIO_CODEC_I2C_SCL_PIN // GPIO_NUM_2
+// #define DISPLAY_I2C_ADDR     0x3C // Common OLED I2C address, verify for your module (0x3C or 0x3D)
+// // #define DISPLAY_RESET_PIN    GPIO_NUM_18 // Optional: Define if your OLED has a RESET pin and you want to use it
+
+/////////////////////////////////////////////
+#ifdef CONFIG_LCD_ST7789_240X240_7PIN
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_12
+#define DISPLAY_CS_PIN        GPIO_NUM_NC
+#else
+#define DISPLAY_CS_PIN         GPIO_NUM_NC
+#define DISPLAY_BACKLIGHT_PIN  GPIO_NUM_12
+#endif
+
+#define DISPLAY_MOSI_PIN      GPIO_NUM_9
+#define DISPLAY_CLK_PIN       GPIO_NUM_6
+#define DISPLAY_DC_PIN        GPIO_NUM_11
+#define DISPLAY_RST_PIN       GPIO_NUM_10
+
+
+#ifdef CONFIG_LCD_ST7789_240X320
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_240X320_NO_IPS
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    false
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_170X320
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   170
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  35
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_172X320
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   172
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  34
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_240X280
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  280
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  20
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_240X240
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7789_240X240_7PIN
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 2
+#endif
+
+#ifdef CONFIG_LCD_ST7789_240X135
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  135
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY true
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  40
+#define DISPLAY_OFFSET_Y  53
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7735_128X160
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   128
+#define DISPLAY_HEIGHT  160
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y true
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    false
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7735_128X128
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   128
+#define DISPLAY_HEIGHT  128
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y true
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR  false
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  32
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ST7796_320X480
+#define LCD_TYPE_ST7789_SERIAL
+#define DISPLAY_WIDTH   320
+#define DISPLAY_HEIGHT  480
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ILI9341_240X320
+#define LCD_TYPE_ILI9341_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_ILI9341_240X320_NO_IPS
+#define LCD_TYPE_ILI9341_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    false
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_GC9A01_240X240
+#define LCD_TYPE_GC9A01_SERIAL
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  240
+#define DISPLAY_MIRROR_X true
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+#ifdef CONFIG_LCD_CUSTOM
+#define DISPLAY_WIDTH   240
+#define DISPLAY_HEIGHT  320
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define DISPLAY_SWAP_XY false
+#define DISPLAY_INVERT_COLOR    true
+#define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_RGB
+#define DISPLAY_OFFSET_X  0
+#define DISPLAY_OFFSET_Y  0
+#define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
+#define DISPLAY_SPI_MODE 0
+#endif
+
+//////////////////////////////////////////////
+
+
+
+
 
 //LIS2DH12
 #define LIS2DH12_I2C_ADDRESS       0x19 // LIS2DH12TR I2C 地址

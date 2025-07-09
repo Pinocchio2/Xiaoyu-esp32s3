@@ -3,7 +3,9 @@
     "builds": [
         {
             "name": "yuwell-xiaoyu-esp32s3",
-            "sdkconfig_append": []
+            "sdkconfig_append": [
+                "LCD_ST7789_240X240_7PIN=y"
+            ]
         }
     ]
 }
