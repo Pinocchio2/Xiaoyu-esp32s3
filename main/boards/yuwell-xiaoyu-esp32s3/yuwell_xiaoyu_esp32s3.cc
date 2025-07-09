@@ -29,7 +29,7 @@ LV_FONT_DECLARE(font_awesome_14_1);
 
 // 移除了 CustomLcdDisplay 类，因为我们将直接使用 OledDisplay 或其父类 Display
 
-class MovecallMojiESP32S3 : public DualNetworkBoard {
+class YuwellXiaoyuEsp32S3Board : public DualNetworkBoard {
 private:
     i2c_master_bus_handle_t i2c_bus_; // 统一的I2C总线句柄，供显示屏和音频编解码器共用
     Button boot_button_;
@@ -193,7 +193,7 @@ private:
          thing_manager.AddThing(iot::CreateThing("BluetoothControl"));   
     }
 public:
-    MovecallMojiESP32S3() : 
+    YuwellXiaoyuEsp32S3Board() : 
         DualNetworkBoard(ML307_TX_PIN, ML307_RX_PIN, 4096),
         boot_button_(BOOT_BUTTON_GPIO),
         internal_button_(INTERNAL_BUTTON_GPIO), // 新增内部按钮
