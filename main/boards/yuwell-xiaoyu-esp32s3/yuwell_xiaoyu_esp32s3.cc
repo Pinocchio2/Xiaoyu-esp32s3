@@ -140,6 +140,7 @@ private:
  
 
         esp_lcd_panel_init(panel);
+        esp_lcd_panel_disp_on_off(panel, true); // 打开显示
         esp_lcd_panel_invert_color(panel, DISPLAY_INVERT_COLOR);
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
@@ -276,7 +277,7 @@ private:
 
     
 
-    /////////////////////////////////////
+    
 
      virtual Display* GetDisplay() override {
         return display_;
@@ -304,7 +305,8 @@ public:
         InitializeIot();            // 初始化IOT
         // 初始化背光
          if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
-            GetBacklight()->RestoreBrightness();
+            //GetBacklight()->RestoreBrightness();
+            GetBacklight()->SetBrightness(100);
         }             
     }
 
