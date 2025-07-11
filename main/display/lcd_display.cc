@@ -1,7 +1,7 @@
 #include "lcd_display.h"
 
 #include <vector>
-#include <font_awesome_symbols.h>
+#include "font_awesome_symbols.h"
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_lvgl_port.h>
@@ -14,26 +14,26 @@
 #define TAG "LcdDisplay"
 
 // Color definitions for dark theme
-#define DARK_BACKGROUND_COLOR       lv_color_hex(0x121212)     // Dark background
-#define DARK_TEXT_COLOR             lv_color_white()           // White text
-#define DARK_CHAT_BACKGROUND_COLOR  lv_color_hex(0x1E1E1E)     // Slightly lighter than background
-#define DARK_USER_BUBBLE_COLOR      lv_color_hex(0x1A6C37)     // Dark green
-#define DARK_ASSISTANT_BUBBLE_COLOR lv_color_hex(0x333333)     // Dark gray
-#define DARK_SYSTEM_BUBBLE_COLOR    lv_color_hex(0x2A2A2A)     // Medium gray
-#define DARK_SYSTEM_TEXT_COLOR      lv_color_hex(0xAAAAAA)     // Light gray text
-#define DARK_BORDER_COLOR           lv_color_hex(0x333333)     // Dark gray border
-#define DARK_LOW_BATTERY_COLOR      lv_color_hex(0xFF0000)     // Red for dark mode
+#define DARK_BACKGROUND_COLOR       lv_color_hex(0x121212)
+#define DARK_TEXT_COLOR             lv_color_white()
+#define DARK_CHAT_BACKGROUND_COLOR  lv_color_hex(0x1E1E1E)
+#define DARK_USER_BUBBLE_COLOR      lv_color_hex(0x1A6C37)
+#define DARK_ASSISTANT_BUBBLE_COLOR lv_color_hex(0x333333)
+#define DARK_SYSTEM_BUBBLE_COLOR    lv_color_hex(0x2A2A2A)
+#define DARK_SYSTEM_TEXT_COLOR      lv_color_hex(0xAAAAAA)
+#define DARK_BORDER_COLOR           lv_color_hex(0x333333)
+#define DARK_LOW_BATTERY_COLOR      lv_color_hex(0xFF0000)
 
 // Color definitions for light theme
-#define LIGHT_BACKGROUND_COLOR       lv_color_white()           // White background
-#define LIGHT_TEXT_COLOR             lv_color_black()           // Black text
-#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)     // Light gray background
-#define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)     // WeChat green
-#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()           // White
-#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)     // Light gray
-#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)     // Dark gray text
-#define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
-#define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
+#define LIGHT_BACKGROUND_COLOR       lv_color_white()
+#define LIGHT_TEXT_COLOR             lv_color_black()
+#define LIGHT_CHAT_BACKGROUND_COLOR  lv_color_hex(0xE0E0E0)
+#define LIGHT_USER_BUBBLE_COLOR      lv_color_hex(0x95EC69)
+#define LIGHT_ASSISTANT_BUBBLE_COLOR lv_color_white()
+#define LIGHT_SYSTEM_BUBBLE_COLOR    lv_color_hex(0xE0E0E0)
+#define LIGHT_SYSTEM_TEXT_COLOR      lv_color_hex(0x666666)
+#define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)
+#define LIGHT_LOW_BATTERY_COLOR      lv_color_black()
 
 // Theme color structure
 struct ThemeColors {
@@ -226,6 +226,10 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 }
 
 LcdDisplay::~LcdDisplay() {
+     if (eye_animation_timer_) {
+        lv_timer_del(eye_animation_timer_);
+        eye_animation_timer_ = nullptr;
+    }
     // 然后再清理 LVGL 对象
     if (content_ != nullptr) {
         lv_obj_del(content_);
@@ -320,11 +324,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_align(status_bar_, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     // 创建emotion_label_在状态栏最左侧
-    emotion_label_ = lv_label_create(status_bar_);
-    lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
-    lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
-    lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
-    lv_obj_set_style_margin_right(emotion_label_, 5, 0); // 添加右边距，与后面的元素分隔
+    // emotion_label_ = lv_label_create(status_bar_);
+    // lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
+    // lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
+    // lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
+    // lv_obj_set_style_margin_right(emotion_label_, 5, 0); // 添加右边距，与后面的元素分隔
 
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_flex_grow(notification_label_, 1);
@@ -370,7 +374,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
 }
 
-#define  MAX_MESSAGES 20
+#define MAX_MESSAGES 20
 void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
     if (content_ == nullptr) {
@@ -408,7 +412,7 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     lv_label_set_text(msg_text, content);
     
     // 计算文本实际宽度
-    lv_coord_t text_width = lv_txt_get_width(content, strlen(content), fonts_.text_font, 0);
+    lv_coord_t text_width = lv_txt_get_width(content, strlen(content), fonts_.text_font, 0, LV_TEXT_FLAG_NONE);
 
     // 计算气泡宽度
     lv_coord_t max_width = LV_HOR_RES * 85 / 100 - 16;  // 屏幕宽度的85%
@@ -574,10 +578,70 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_flow(content_, LV_FLEX_FLOW_COLUMN); // 垂直布局（从上到下）
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
 
-    emotion_label_ = lv_label_create(content_);
-    lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
-    lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
-    lv_label_set_text(emotion_label_, FONT_AWESOME_AI_CHIP);
+    // ++ 眼睛画布和静态图标的创建与配置 ++
+    eye_canvas_ = lv_canvas_create(content_);
+    lv_obj_set_size(eye_canvas_, 128, 64);
+    lv_obj_center(eye_canvas_);
+
+    icon_label_ = lv_label_create(content_);
+    lv_obj_set_style_text_font(icon_label_, &font_awesome_30_4, 0);
+    lv_obj_set_style_text_color(icon_label_, current_theme.text, 0);
+    lv_obj_center(icon_label_);
+    lv_obj_add_flag(icon_label_, LV_OBJ_FLAG_HIDDEN);
+
+    current_eye_config_ = Preset_Normal;
+    eye_transition_.Origin = &current_eye_config_;
+
+    // esp_timer_create_args_t eye_timer_args = {
+    //     .callback = [](void* arg) {
+    //         LcdDisplay* display = static_cast<LcdDisplay*>(arg);
+    //         display->eye_transition_.Update();
+    //         if (display->eye_canvas_) {
+    //             lv_obj_invalidate(display->eye_canvas_);
+    //         }
+    //     },
+    //     .arg = this,
+    //     .name = "eye_animation_timer"
+    // };
+    // esp_timer_create(&eye_timer_args, &eye_animation_timer_);
+    // esp_timer_start_periodic(eye_animation_timer_, 33 * 1000);
+
+    // *** 这是最关键的修正：使用 lv_timer_create 替代 esp_timer_create ***
+      eye_animation_timer_ = lv_timer_create([](lv_timer_t* timer) {
+        LcdDisplay* display = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+        display->eye_transition_.Update();
+        if (display->eye_canvas_) {
+            lv_obj_invalidate(display->eye_canvas_);
+        }
+    }, 33, this); // 周期为 33ms (~30 FPS)
+    // ***************************************************************
+
+    lv_obj_add_event_cb(eye_canvas_, [](lv_event_t * e) {
+        LcdDisplay* display = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+        lv_obj_t* canvas = static_cast<lv_obj_t*>(lv_event_get_target(e));
+        lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_TRANSP);
+
+        lv_draw_rect_dsc_t rect_dsc;
+        lv_draw_rect_dsc_init(&rect_dsc);
+        rect_dsc.bg_color = lv_color_white();
+        
+        EyeConfig* config = &display->current_eye_config_;
+        int16_t centerX = lv_obj_get_width(canvas) / 2;
+        int16_t centerY = lv_obj_get_height(canvas) / 2;
+        
+        rect_dsc.radius = config->Radius_Top;
+
+        // 创建区域结构体来定义绘制区域
+        lv_area_t rect_area;
+        rect_area.x1 = centerX - config->Width / 2 + config->OffsetX;
+        rect_area.y1 = centerY - config->Height / 2 + config->OffsetY;
+        rect_area.x2 = rect_area.x1 + config->Width - 1;
+        rect_area.y2 = rect_area.y1 + config->Height - 1;
+
+        lv_draw_rect(lv_event_get_layer(e), &rect_dsc, &rect_area);
+
+    }, LV_EVENT_DRAW_MAIN, this);
+    // -- 眼睛动画初始化完毕 --
 
     chat_message_label_ = lv_label_create(content_);
     lv_label_set_text(chat_message_label_, "");
@@ -637,61 +701,40 @@ void LcdDisplay::SetupUI() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
-    struct Emotion {
-        const char* icon;
-        const char* text;
-    };
-
-    static const std::vector<Emotion> emotions = {
-        {"😶", "neutral"},
-        {"🙂", "happy"},
-        {"😆", "laughing"},
-        {"😂", "funny"},
-        {"😔", "sad"},
-        {"😠", "angry"},
-        {"😭", "crying"},
-        {"😍", "loving"},
-        {"😳", "embarrassed"},
-        {"😯", "surprised"},
-        {"😱", "shocked"},
-        {"🤔", "thinking"},
-        {"😉", "winking"},
-        {"😎", "cool"},
-        {"😌", "relaxed"},
-        {"🤤", "delicious"},
-        {"😘", "kissy"},
-        {"😏", "confident"},
-        {"😴", "sleepy"},
-        {"😜", "silly"},
-        {"🙄", "confused"}
-    };
-    
-    // 查找匹配的表情
-    std::string_view emotion_view(emotion);
-    auto it = std::find_if(emotions.begin(), emotions.end(),
-        [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
-
     DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
-        return;
+
+    // 切换到情感模式时，确保图标是隐藏的，眼睛画布是显示的
+    if (icon_label_) {
+        lv_obj_add_flag(icon_label_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (eye_canvas_) {
+        lv_obj_clear_flag(eye_canvas_, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
-    lv_obj_set_style_text_font(emotion_label_, fonts_.emoji_font, 0);
-    if (it != emotions.end()) {
-        lv_label_set_text(emotion_label_, it->icon);
-    } else {
-        lv_label_set_text(emotion_label_, "😶");
+    // 设置目标表情并启动动画
+    if (strcmp(emotion, "happy") == 0) {
+        eye_transition_.Destin = Preset_Happy;
+    } else { // "neutral" 或其他未知表情都回到 Normal
+        eye_transition_.Destin = Preset_Normal;
     }
+    eye_transition_.Animation.Restart();
 }
 
 void LcdDisplay::SetIcon(const char* icon) {
     DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
+    if (icon_label_ == nullptr) {
         return;
     }
-    lv_obj_set_style_text_font(emotion_label_, &font_awesome_30_4, 0);
-    lv_label_set_text(emotion_label_, icon);
+    
+    // 切换到图标模式时，确保眼睛画布是隐藏的，图标是显示的
+    if (eye_canvas_) {
+        lv_obj_add_flag(eye_canvas_, LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_clear_flag(icon_label_, LV_OBJ_FLAG_HIDDEN);
+
+    // 设置图标
+    lv_obj_set_style_text_font(icon_label_, &font_awesome_30_4, 0);
+    lv_label_set_text(icon_label_, icon);
 }
 
 void LcdDisplay::SetTheme(const std::string& theme_name) {
@@ -872,8 +915,8 @@ void LcdDisplay::SetTheme(const std::string& theme_name) {
             lv_obj_set_style_text_color(chat_message_label_, current_theme.text, 0);
         }
         
-        if (emotion_label_ != nullptr) {
-            lv_obj_set_style_text_color(emotion_label_, current_theme.text, 0);
+        if (icon_label_ != nullptr) { // 修正：emotion_label_ 已被替换
+            lv_obj_set_style_text_color(icon_label_, current_theme.text, 0);
         }
 #endif
     }
@@ -886,19 +929,3 @@ void LcdDisplay::SetTheme(const std::string& theme_name) {
     // No errors occurred. Save theme to settings
     Display::SetTheme(theme_name);
 }
-
-// void LcdDisplay::CreateStatusBar() {
-//     // ... existing code ...
-    
-//     // 创建蓝牙图标标签
-//     bluetooth_label_ = lv_label_create(status_bar_);
-//     lv_obj_set_style_text_font(bluetooth_label_, icon_font_, 0);
-//     lv_label_set_text(bluetooth_label_, FONT_AWESOME_BLUETOOTH_OFF);
-//     lv_obj_set_style_text_color(bluetooth_label_, lv_color_hex(0x888888), 0);
-    
-//     // 设置蓝牙图标位置（在WiFi图标旁边）
-//     lv_obj_align_to(bluetooth_label_, wifi_label_, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
-    
-//     bluetooth_icon_ = FONT_AWESOME_BLUETOOTH_OFF;
-//     bluetooth_enabled_ = false;
-// }

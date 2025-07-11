@@ -2,6 +2,8 @@
 #define LCD_DISPLAY_H
 
 #include "display.h"
+#include "MinimalEye.h"
+#include <lvgl.h>  // 确保这个头文件被包含
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
@@ -14,11 +16,18 @@ protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
     
-    lv_draw_buf_t draw_buf_;
     lv_obj_t* status_bar_ = nullptr;
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
+
+    // ++ 为眼睛动画添加的成员变量 (已修正) ++
+    lv_obj_t* eye_canvas_ = nullptr; // 用于绘制眼睛的画布
+    lv_obj_t* icon_label_ = nullptr;  // 用于显示静态图标
+    EyeConfig current_eye_config_;   // 眼睛当前状态
+    EyeTransition eye_transition_;   // 眼睛动画控制器
+    lv_timer_t* eye_animation_timer_ = nullptr; // 眼睛动画的定时器
+    // -- 眼睛动画变量结束 --
 
     DisplayFonts fonts_;
 
@@ -52,16 +61,7 @@ public:
                   DisplayFonts fonts);
 };
 
-// MIPI LCD显示器
-class MipiLcdDisplay : public LcdDisplay {
-public:
-    MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
-                   int width, int height, int offset_x, int offset_y,
-                   bool mirror_x, bool mirror_y, bool swap_xy,
-                   DisplayFonts fonts);
-};
-
-// // SPI LCD显示器
+// SPI LCD显示器
 class SpiLcdDisplay : public LcdDisplay {
 public:
     SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,

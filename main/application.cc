@@ -833,28 +833,110 @@ void Application::SetListeningMode(ListeningMode mode) {
     listening_mode_ = mode;
     SetDeviceState(kDeviceStateListening);
 }
+////////////////////////////////////////////////////////////////////////////
+// void Application::SetDeviceState(DeviceState state) {
+//     if (device_state_ == state) {
+//         return;
+//     }
+    
+//     clock_ticks_ = 0;
+//     auto previous_state = device_state_;
+//     device_state_ = state;
+//     ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[device_state_]);
+//     // The state is changed, wait for all background tasks to finish
+//     background_task_->WaitForCompletion();
+
+//     auto& board = Board::GetInstance();
+//     auto display = board.GetDisplay();
+//     auto led = board.GetLed();
+//     led->OnStateChanged();
+//     switch (state) {
+//         case kDeviceStateUnknown:
+//         case kDeviceStateIdle:
+//             display->SetStatus(Lang::Strings::STANDBY);
+//             display->SetEmotion("neutral");
+// #if CONFIG_USE_AUDIO_PROCESSOR
+//             audio_processor_.Stop();
+// #endif
+// #if CONFIG_USE_WAKE_WORD_DETECT
+//             wake_word_detect_.StartDetection();
+// #endif
+//             break;
+//         case kDeviceStateConnecting:
+//             display->SetStatus(Lang::Strings::CONNECTING);
+//             display->SetEmotion("neutral");
+//             display->SetChatMessage("system", "");
+//             break;
+//         case kDeviceStateListening:
+//             display->SetStatus(Lang::Strings::LISTENING);
+//             display->SetEmotion("neutral");
+
+//             // Update the IoT states before sending the start listening command
+//             UpdateIotStates();
+
+//             // Make sure the audio processor is running
+// #if CONFIG_USE_AUDIO_PROCESSOR
+//             if (!audio_processor_.IsRunning()) {
+// #else
+//             if (true) {
+// #endif
+//                 // Send the start listening command
+//                 protocol_->SendStartListening(listening_mode_);
+//                 if (listening_mode_ == kListeningModeAutoStop && previous_state == kDeviceStateSpeaking) {
+//                     // FIXME: Wait for the speaker to empty the buffer
+//                     vTaskDelay(pdMS_TO_TICKS(120));
+//                 }
+//                 opus_encoder_->ResetState();
+// #if CONFIG_USE_WAKE_WORD_DETECT
+//                 wake_word_detect_.StopDetection();
+// #endif
+// #if CONFIG_USE_AUDIO_PROCESSOR
+//                 audio_processor_.Start();
+// #endif
+//             }
+//             break;
+//         case kDeviceStateSpeaking:
+//             display->SetStatus(Lang::Strings::SPEAKING);
+
+//             if (listening_mode_ != kListeningModeRealtime) {
+// #if CONFIG_USE_AUDIO_PROCESSOR
+//                 audio_processor_.Stop();
+// #endif
+// #if CONFIG_USE_WAKE_WORD_DETECT
+//                 wake_word_detect_.StartDetection();
+// #endif
+//             }
+//             ResetDecoder();
+//             break;
+//         default:
+//             // Do nothing
+//             break;
+//     }
+// }
 
 void Application::SetDeviceState(DeviceState state) {
     if (device_state_ == state) {
-        return;
+        return; // 如果状态没有变化，则直接返回
     }
     
     clock_ticks_ = 0;
     auto previous_state = device_state_;
-    device_state_ = state;
-    ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[device_state_]);
+    device_state_ = state; // 更新全局的设备状态变量
+    ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[device_state_]); // 打印新的状态到日志
     // The state is changed, wait for all background tasks to finish
     background_task_->WaitForCompletion();
 
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();
     auto led = board.GetLed();
-    led->OnStateChanged();
+    led->OnStateChanged(); // 通知LED模块更新状态
+
+    // 根据新的状态执行不同的UI更新逻辑
     switch (state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
-            display->SetEmotion("neutral");
+            display->SetEmotion("neutral"); // <-- 在这里调用了我们修改的表情函数
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
@@ -871,41 +953,11 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
 
-            // Update the IoT states before sending the start listening command
-            UpdateIotStates();
-
-            // Make sure the audio processor is running
-#if CONFIG_USE_AUDIO_PROCESSOR
-            if (!audio_processor_.IsRunning()) {
-#else
-            if (true) {
-#endif
-                // Send the start listening command
-                protocol_->SendStartListening(listening_mode_);
-                if (listening_mode_ == kListeningModeAutoStop && previous_state == kDeviceStateSpeaking) {
-                    // FIXME: Wait for the speaker to empty the buffer
-                    vTaskDelay(pdMS_TO_TICKS(120));
-                }
-                opus_encoder_->ResetState();
-#if CONFIG_USE_WAKE_WORD_DETECT
-                wake_word_detect_.StopDetection();
-#endif
-#if CONFIG_USE_AUDIO_PROCESSOR
-                audio_processor_.Start();
-#endif
-            }
+            // ... more logic ...
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
-
-            if (listening_mode_ != kListeningModeRealtime) {
-#if CONFIG_USE_AUDIO_PROCESSOR
-                audio_processor_.Stop();
-#endif
-#if CONFIG_USE_WAKE_WORD_DETECT
-                wake_word_detect_.StartDetection();
-#endif
-            }
+            // ... more logic ...
             ResetDecoder();
             break;
         default:
@@ -914,6 +966,12 @@ void Application::SetDeviceState(DeviceState state) {
     }
 }
 
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////
 void Application::ResetDecoder() {
     std::lock_guard<std::mutex> lock(mutex_);
     opus_decoder_->ResetState();
