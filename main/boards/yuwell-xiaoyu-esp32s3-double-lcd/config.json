@@ -2,9 +2,9 @@
     "target": "esp32s3",
     "builds": [
         {
-            "name": "yuwell-xiaoyu-esp32s3",
+            "name": "yuwell-xiaoyu-esp32s3-double-lcd",
             "sdkconfig_append": [
-                "CONFIG_LCD_ST7789_240X240=y"
+                "LCD_ST7789_240X240_7PIN=y"
             ]
         }
     ]

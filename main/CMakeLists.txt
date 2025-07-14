@@ -141,6 +141,9 @@ elseif(CONFIG_BOARD_TYPE_ESP32_CGC)
     # --- 新开发板 ---
 elseif(CONFIG_BOARD_TYPE_YUWELL_XIAOYU_ESP32S3)
     set(BOARD_TYPE "yuwell-xiaoyu-esp32s3")
+    # 双屏
+elseif(CONFIG_BOARD_TYPE_YUWELL_XIAOYU_ESP32S3_DOUBLE_LCD)
+    set(BOARD_TYPE "yuwell-xiaoyu-esp32s3-double-lcd")
 # -------------------------
 endif()
 file(GLOB BOARD_SOURCES

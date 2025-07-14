@@ -19,33 +19,16 @@
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_45
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
 
-#define BUILTIN_LED_GPIO        GPIO_NUM_33 /////
+#define BUILTIN_LED_GPIO        GPIO_NUM_33 
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
 
 
-// #define DISPLAY_TYPE_OLED
-// #define DISPLAY_WIDTH   128
-// #define DISPLAY_HEIGHT  64
-// #define DISPLAY_MIRROR_X false // Adjust as needed for your OLED
-// #define DISPLAY_MIRROR_Y false // Adjust as needed for your OLED
-// #define DISPLAY_SWAP_XY false  // Adjust as needed for your OLED
-
-// #define DISPLAY_OFFSET_X  0
-// #define DISPLAY_OFFSET_Y  0
-
-// I2C pins for OLED (shared with audio codec)
-// #define DISPLAY_I2C_SDA_PIN  AUDIO_CODEC_I2C_SDA_PIN // GPIO_NUM_1
-// #define DISPLAY_I2C_SCL_PIN  AUDIO_CODEC_I2C_SCL_PIN // GPIO_NUM_2
-// #define DISPLAY_I2C_ADDR     0x3C // Common OLED I2C address, verify for your module (0x3C or 0x3D)
-// // #define DISPLAY_RESET_PIN    GPIO_NUM_18 // Optional: Define if your OLED has a RESET pin and you want to use it
-
-/////////////////////////////////////////////
 #ifdef CONFIG_LCD_ST7789_240X240_7PIN
-#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_12
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_43
 #define DISPLAY_CS_PIN        GPIO_NUM_NC
 #else
-#define DISPLAY_CS_PIN         GPIO_NUM_NC
-#define DISPLAY_BACKLIGHT_PIN  GPIO_NUM_12
+#define DISPLAY_CS_PIN         GPIO_NUM_12
+#define DISPLAY_BACKLIGHT_PIN  GPIO_NUM_43
 #endif
 
 #define DISPLAY_MOSI_PIN      GPIO_NUM_9
