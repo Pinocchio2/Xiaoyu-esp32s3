@@ -8,7 +8,8 @@ class DualDisplayManager {
 private:
     LcdDisplay* primary_display_;
     LcdDisplay* secondary_display_;
-    
+    SpiLcdDisplay* CreateSpiLcdDisplayWithoutInit(
+        esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts);
 public:
     DualDisplayManager();
     ~DualDisplayManager();

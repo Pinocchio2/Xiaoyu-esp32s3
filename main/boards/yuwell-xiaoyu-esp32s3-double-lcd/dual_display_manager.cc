@@ -3,12 +3,14 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_io.h>
 #include <driver/spi_common.h>
+#include <vector>  // 添加vector头文件
 
 // 添加字体声明
 LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(font_awesome_16_4);
 
 static const char* TAG = "DualDisplayManager";
+static bool lvgl_initialized = false;  // 添加全局标志
 
 DualDisplayManager::DualDisplayManager() 
     : primary_display_(nullptr), secondary_display_(nullptr) {
@@ -30,7 +32,14 @@ void DualDisplayManager::Initialize() {
     buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
     ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
     
-    // 初始化主显示屏
+    // 准备字体配置
+    DisplayFonts fonts = {
+        .text_font = &font_puhui_16_4,
+        .icon_font = &font_awesome_16_4,
+        .emoji_font = font_emoji_32_init(),
+    };
+    
+    // 初始化主显示屏硬件
     esp_lcd_panel_io_handle_t panel_io1;
     esp_lcd_panel_handle_t panel1;
     
@@ -57,25 +66,19 @@ void DualDisplayManager::Initialize() {
     esp_lcd_panel_swap_xy(panel1, DISPLAY_SWAP_XY);
     esp_lcd_panel_mirror(panel1, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
     
-    // 修复主显示屏创建
-    DisplayFonts fonts = {
-        .text_font = &font_puhui_16_4,
-        .icon_font = &font_awesome_16_4,
-        .emoji_font = font_emoji_32_init(),
-    };
-    
-    primary_display_ = new SpiLcdDisplay(panel_io1, panel1,
-                                       DISPLAY_WIDTH, DISPLAY_HEIGHT, 
+    // 创建主显示器（第一次会初始化LVGL）
+    primary_display_ = new SpiLcdDisplay(panel_io1, panel1, DISPLAY_WIDTH, DISPLAY_HEIGHT, 
                                        DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, 
                                        DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                        fonts);
+    lvgl_initialized = true;  // 标记LVGL已初始化
     
-    // 初始化副显示屏
+    // 初始化副显示屏硬件
     esp_lcd_panel_io_handle_t panel_io2;
     esp_lcd_panel_handle_t panel2;
     
     esp_lcd_panel_io_spi_config_t io_config2 = {};
-    io_config2.cs_gpio_num = DISPLAY2_CS_PIN;  // 不同的CS引脚
+    io_config2.cs_gpio_num = DISPLAY2_CS_PIN;
     io_config2.dc_gpio_num = DISPLAY_DC_PIN;
     io_config2.spi_mode = DISPLAY_SPI_MODE;
     io_config2.pclk_hz = 40 * 1000 * 1000;
@@ -90,17 +93,15 @@ void DualDisplayManager::Initialize() {
     panel_config2.bits_per_pixel = 16;
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io2, &panel_config2, &panel2));
     
-    // 注释掉第二个屏幕的复位操作
-    // esp_lcd_panel_reset(panel2);  // 不执行复位
+    // 不执行复位，直接初始化
     esp_lcd_panel_init(panel2);
     esp_lcd_panel_disp_on_off(panel2, true);
     esp_lcd_panel_invert_color(panel2, DISPLAY_INVERT_COLOR);
     esp_lcd_panel_swap_xy(panel2, DISPLAY_SWAP_XY);
     esp_lcd_panel_mirror(panel2, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
     
-    // 修复副显示屏创建
-    secondary_display_ = new SpiLcdDisplay(panel_io2, panel2,
-                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, 
+    // 创建副显示器（LVGL已经初始化，这里会跳过重复初始化）
+    secondary_display_ = new SpiLcdDisplay(panel_io2, panel2, DISPLAY_WIDTH, DISPLAY_HEIGHT, 
                                          DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, 
                                          DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                          fonts);

@@ -80,10 +80,17 @@ static ThemeColors current_theme = LIGHT_THEME;
 
 LV_FONT_DECLARE(font_awesome_30_4);
 
+// 在SpiLcdDisplay构造函数中添加检查
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
-                           int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
+                           int width, int height, int offset_x, int offset_y,
+                           bool mirror_x, bool mirror_y, bool swap_xy,
                            DisplayFonts fonts)
     : LcdDisplay(panel_io, panel, fonts) {
+    
+    // 检查LVGL是否已经初始化
+    static bool lvgl_init_done = false;
+    static bool lvgl_port_init_done = false;
+    
     width_ = width;
     height_ = height;
 
@@ -97,14 +104,22 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     ESP_LOGI(TAG, "Turning display on");
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_, true));
 
-    ESP_LOGI(TAG, "Initialize LVGL library");
-    lv_init();
+    // 只在第一次初始化LVGL
+    if (!lvgl_init_done) {
+        ESP_LOGI(TAG, "Initialize LVGL library");
+        lv_init();
+        lvgl_init_done = true;
+    }
 
-    ESP_LOGI(TAG, "Initialize LVGL port");
-    lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    port_cfg.task_priority = 1;
-    port_cfg.timer_period_ms = 50;
-    lvgl_port_init(&port_cfg);
+    // 只在第一次初始化LVGL端口
+    if (!lvgl_port_init_done) {
+        ESP_LOGI(TAG, "Initialize LVGL port");
+        lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+        port_cfg.task_priority = 1;
+        port_cfg.timer_period_ms = 50;
+        lvgl_port_init(&port_cfg);
+        lvgl_port_init_done = true;
+    }
 
     ESP_LOGI(TAG, "Adding LCD screen");
     const lvgl_port_display_cfg_t display_cfg = {
