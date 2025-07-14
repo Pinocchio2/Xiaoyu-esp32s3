@@ -74,6 +74,13 @@ public:
     void WakeWordInvoke(const std::string& wake_word);
     void PlaySound(const std::string_view& sound);
     bool CanEnterSleepMode();
+    
+    // 表情管理功能
+    void SetEmotion(const char* emotion);
+    void SetEmotionWithDuration(const char* emotion, int duration_ms = 3000);
+    void CycleEmotion(const std::vector<std::string>& emotions, int interval_ms = 2000);
+    void SetRandomEmotion();
+    void ResetToNeutralEmotion();
 
 private:
     Application();
@@ -118,6 +125,13 @@ private:
     std::unique_ptr<OpusEncoderWrapper> opus_encoder_;
     std::unique_ptr<OpusDecoderWrapper> opus_decoder_;
 
+
+     // 表情管理相关成员变量
+    esp_timer_handle_t emotion_timer_handle_ = nullptr;
+    std::string current_emotion_ = "neutral";
+    bool emotion_override_active_ = false;
+
+
     OpusResampler input_resampler_;
     OpusResampler reference_resampler_;
     OpusResampler output_resampler_;
@@ -135,8 +149,11 @@ private:
     void CheckNewVersion();
     void ShowActivationCode();
     void OnClockTimer();
+    void OnEmotionTimer(); 
     void SetListeningMode(ListeningMode mode);
     void AudioLoop();
 };
 
 #endif // _APPLICATION_H_
+
+   

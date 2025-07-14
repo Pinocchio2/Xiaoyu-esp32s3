@@ -15,6 +15,7 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
+#include <vector>
 
 #define TAG "Application"
 
@@ -49,12 +50,29 @@ Application::Application() {
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
     esp_timer_start_periodic(clock_timer_handle_, 1000000);
+    
+    // 初始化表情定时器
+    esp_timer_create_args_t emotion_timer_args = {
+        .callback = [](void* arg) {
+            Application* app = (Application*)arg;
+            app->OnEmotionTimer();
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "emotion_timer",
+        .skip_unhandled_events = true
+    };
+    esp_timer_create(&emotion_timer_args, &emotion_timer_handle_);
 }
 
 Application::~Application() {
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
+    }
+    if (emotion_timer_handle_ != nullptr) {
+        esp_timer_stop(emotion_timer_handle_);
+        esp_timer_delete(emotion_timer_handle_);
     }
     if (background_task_ != nullptr) {
         delete background_task_;
@@ -374,6 +392,7 @@ void Application::Start() {
 
     /* Setup the display */
     auto display = board.GetDisplay();
+    Application::GetInstance().SetEmotion("happy");
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
@@ -916,27 +935,30 @@ void Application::SetListeningMode(ListeningMode mode) {
 
 void Application::SetDeviceState(DeviceState state) {
     if (device_state_ == state) {
-        return; // 如果状态没有变化，则直接返回
+        return;
     }
     
     clock_ticks_ = 0;
     auto previous_state = device_state_;
-    device_state_ = state; // 更新全局的设备状态变量
-    ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[device_state_]); // 打印新的状态到日志
-    // The state is changed, wait for all background tasks to finish
+    device_state_ = state;
+    ESP_LOGI(TAG, "STATE: %s", STATE_STRINGS[device_state_]);
+    
     background_task_->WaitForCompletion();
 
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();
     auto led = board.GetLed();
-    led->OnStateChanged(); // 通知LED模块更新状态
+    led->OnStateChanged();
 
     // 根据新的状态执行不同的UI更新逻辑
     switch (state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
-            display->SetEmotion("neutral"); // <-- 在这里调用了我们修改的表情函数
+            // 只有在没有表情覆盖时才设置默认表情
+            if (!emotion_override_active_) {
+                display->SetEmotion("neutral");
+            }
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
@@ -946,22 +968,58 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
-            display->SetEmotion("neutral");
+            if (!emotion_override_active_) {
+                display->SetEmotion("thinking");
+            }
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("neutral");
+            if (!emotion_override_active_) {
+                display->SetEmotion("happy");
+            }
 
-            // ... more logic ...
+            // Update the IoT states before sending the start listening command
+            UpdateIotStates();
+
+            // Make sure the audio processor is running
+#if CONFIG_USE_AUDIO_PROCESSOR
+            if (!audio_processor_.IsRunning()) {
+#else
+            if (true) {
+#endif
+                // Send the start listening command
+                protocol_->SendStartListening(listening_mode_);
+                if (listening_mode_ == kListeningModeAutoStop && previous_state == kDeviceStateSpeaking) {
+                    // FIXME: Wait for the speaker to empty the buffer
+                    vTaskDelay(pdMS_TO_TICKS(120));
+                }
+                opus_encoder_->ResetState();
+#if CONFIG_USE_WAKE_WORD_DETECT
+                wake_word_detect_.StopDetection();
+#endif
+#if CONFIG_USE_AUDIO_PROCESSOR
+                audio_processor_.Start();
+#endif
+            }
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
-            // ... more logic ...
+            if (!emotion_override_active_) {
+                display->SetEmotion("happy");
+            }
+
+            if (listening_mode_ != kListeningModeRealtime) {
+#if CONFIG_USE_AUDIO_PROCESSOR
+                audio_processor_.Stop();
+#endif
+#if CONFIG_USE_WAKE_WORD_DETECT
+                wake_word_detect_.StartDetection();
+#endif
+            }
             ResetDecoder();
             break;
         default:
-            // Do nothing
             break;
     }
 }
@@ -1009,6 +1067,86 @@ void Application::UpdateIotStates() {
 void Application::Reboot() {
     ESP_LOGI(TAG, "Rebooting...");
     esp_restart();
+}
+
+// 设置表情
+void Application::SetEmotion(const char* emotion) {
+    if (emotion == nullptr) return;
+    
+    auto display = Board::GetInstance().GetDisplay();
+    display->SetEmotion(emotion);
+    current_emotion_ = emotion;
+    emotion_override_active_ = true;
+    
+    ESP_LOGI(TAG, "设置表情: %s", emotion);
+}
+
+// 设置带持续时间的表情
+void Application::SetEmotionWithDuration(const char* emotion, int duration_ms) {
+    SetEmotion(emotion);
+    
+    // 停止之前的定时器
+    esp_timer_stop(emotion_timer_handle_);
+    
+    // 启动新的定时器，到期后恢复中性表情
+    esp_timer_start_once(emotion_timer_handle_, duration_ms * 1000); // 转换为微秒
+}
+
+// 循环播放表情序列
+void Application::CycleEmotion(const std::vector<std::string>& emotions, int interval_ms) {
+    if (emotions.empty()) return;
+    
+    static size_t emotion_index = 0;
+    static std::vector<std::string> emotion_cycle;
+    
+    // 如果是新的表情序列，重置索引
+    if (emotion_cycle != emotions) {
+        emotion_cycle = emotions;
+        emotion_index = 0;
+    }
+    
+    // 设置当前表情
+    SetEmotion(emotion_cycle[emotion_index].c_str());
+    
+    // 更新索引
+    emotion_index = (emotion_index + 1) % emotion_cycle.size();
+    
+    // 停止之前的定时器
+    esp_timer_stop(emotion_timer_handle_);
+    
+    // 如果不是最后一个表情，设置定时器继续循环
+    if (emotion_index != 0) {
+        esp_timer_start_once(emotion_timer_handle_, interval_ms * 1000);
+    }
+}
+
+// 设置随机表情
+void Application::SetRandomEmotion() {
+    static const std::vector<std::string> emotions = {
+        "happy", "laughing", "funny", "surprised", 
+        "thinking", "winking", "cool", "relaxed"
+    };
+    
+    // 生成随机索引
+    int random_index = esp_random() % emotions.size();
+    SetEmotion(emotions[random_index].c_str());
+}
+
+// 重置为中性表情
+void Application::ResetToNeutralEmotion() {
+    esp_timer_stop(emotion_timer_handle_);
+    emotion_override_active_ = false;
+    
+    // 如果当前处于空闲状态，设置为中性表情
+    if (device_state_ == kDeviceStateIdle) {
+        SetEmotion("neutral");
+    }
+}
+
+// 表情定时器回调
+void Application::OnEmotionTimer() {
+    // 定时器到期，恢复中性表情
+    ResetToNeutralEmotion();
 }
 
 void Application::WakeWordInvoke(const std::string& wake_word) {

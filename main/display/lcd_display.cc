@@ -579,9 +579,13 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_flex_align(content_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_SPACE_EVENLY); // 子对象居中对齐，等距分布
 
     // ++ 眼睛画布和静态图标的创建与配置 ++
+    // 创建眼睛画布
     eye_canvas_ = lv_canvas_create(content_);
     lv_obj_set_size(eye_canvas_, 128, 64);
     lv_obj_center(eye_canvas_);
+    
+    // 初始化眼睛动画
+    eye_transition_.Origin = &current_eye_config_;
 
     icon_label_ = lv_label_create(content_);
     lv_obj_set_style_text_font(icon_label_, &font_awesome_30_4, 0);
@@ -616,30 +620,33 @@ void LcdDisplay::SetupUI() {
     }, 33, this); // 周期为 33ms (~30 FPS)
     // ***************************************************************
 
+    // 眼睛绘制回调
     lv_obj_add_event_cb(eye_canvas_, [](lv_event_t * e) {
         LcdDisplay* display = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
         lv_obj_t* canvas = static_cast<lv_obj_t*>(lv_event_get_target(e));
-        lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_TRANSP);
-
-        lv_draw_rect_dsc_t rect_dsc;
-        lv_draw_rect_dsc_init(&rect_dsc);
-        rect_dsc.bg_color = lv_color_white();
         
+        // 清空画布
+        lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_TRANSP);
+        
+        // 获取眼睛配置
         EyeConfig* config = &display->current_eye_config_;
         int16_t centerX = lv_obj_get_width(canvas) / 2;
         int16_t centerY = lv_obj_get_height(canvas) / 2;
         
+        // 绘制眼睛矩形
+        lv_draw_rect_dsc_t rect_dsc;
+        lv_draw_rect_dsc_init(&rect_dsc);
+        rect_dsc.bg_color = lv_color_white();
         rect_dsc.radius = config->Radius_Top;
-
-        // 创建区域结构体来定义绘制区域
+        
+        // 计算绘制区域
         lv_area_t rect_area;
         rect_area.x1 = centerX - config->Width / 2 + config->OffsetX;
         rect_area.y1 = centerY - config->Height / 2 + config->OffsetY;
         rect_area.x2 = rect_area.x1 + config->Width - 1;
         rect_area.y2 = rect_area.y1 + config->Height - 1;
-
+        
         lv_draw_rect(lv_event_get_layer(e), &rect_dsc, &rect_area);
-
     }, LV_EVENT_DRAW_MAIN, this);
     // -- 眼睛动画初始化完毕 --
 
