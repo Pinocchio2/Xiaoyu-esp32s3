@@ -31,6 +31,8 @@
 #define DISPLAY_DC_PIN        GPIO_NUM_11
 #define DISPLAY_RST_PIN       GPIO_NUM_10
 
+#define DISPLAY2_CS_PIN        GPIO_NUM_44  //第二块屏幕
+
 
 
 
@@ -46,6 +48,8 @@
 #define DISPLAY_OFFSET_Y  0
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 #define DISPLAY_SPI_MODE 0
+
+
 
 
 
