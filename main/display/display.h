@@ -36,6 +36,8 @@ public:
      */
     void UpdateBluetoothStatus(bool is_enabled);
 
+    lv_display_t* getLvDisplay() { return display_; }//
+    
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
