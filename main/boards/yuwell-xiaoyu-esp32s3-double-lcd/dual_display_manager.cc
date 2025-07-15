@@ -125,6 +125,45 @@ void DualDisplayManager::Initialize() {
     InitializeUI();
 }
 
+// void DualDisplayManager::InitializeUI() {
+//     if (!primary_display_ || !secondary_display_) {
+//         ESP_LOGE(TAG, "Cannot initialize UI, displays are not ready.");
+//         return;
+//     }
+
+//     // 初始化主屏幕UI
+//     {
+//         DisplayLockGuard lock(primary_display_);
+//         lv_obj_t* prim_scr = lv_disp_get_scr_act(primary_display_->getLvDisplay());
+//         lv_obj_clean(prim_scr);
+//         lv_obj_set_style_bg_color(prim_scr, lv_color_black(), 0);
+//         primary_img_obj_ = lv_img_create(prim_scr);
+        
+//         // 设置图像对象的确切尺寸和位置
+//         lv_obj_set_size(primary_img_obj_, 240, 240);
+//         lv_obj_set_pos(primary_img_obj_, 0, 0);
+        
+//         // 确保图像不会被缩放
+//         lv_obj_set_style_transform_scale(primary_img_obj_, 256, 0); // 256 = 100%
+//     }
+
+//     // 初始化副屏幕UI
+//     {
+//         DisplayLockGuard lock(secondary_display_);
+//         lv_obj_t* sec_scr = lv_disp_get_scr_act(secondary_display_->getLvDisplay());
+//         lv_obj_clean(sec_scr);
+//         lv_obj_set_style_bg_color(sec_scr, lv_color_black(), 0);
+//         secondary_img_obj_ = lv_img_create(sec_scr);
+        
+//         // 设置图像对象的确切尺寸和位置
+//         lv_obj_set_size(secondary_img_obj_, 240, 240);
+//         lv_obj_set_pos(secondary_img_obj_, 0, 0);
+        
+//         // 确保图像不会被缩放
+//         lv_obj_set_style_transform_scale(secondary_img_obj_, 256, 0); // 256 = 100%
+//     }
+//     ESP_LOGI(TAG, "Dual screen UI initialized for eye animation.");
+// }
 void DualDisplayManager::InitializeUI() {
     if (!primary_display_ || !secondary_display_) {
         ESP_LOGE(TAG, "Cannot initialize UI, displays are not ready.");
@@ -137,33 +176,65 @@ void DualDisplayManager::InitializeUI() {
         lv_obj_t* prim_scr = lv_disp_get_scr_act(primary_display_->getLvDisplay());
         lv_obj_clean(prim_scr);
         lv_obj_set_style_bg_color(prim_scr, lv_color_black(), 0);
-        primary_img_obj_ = lv_img_create(prim_scr);
-        
-        // 设置图像对象的确切尺寸和位置
-        lv_obj_set_size(primary_img_obj_, 240, 240);
-        lv_obj_set_pos(primary_img_obj_, 0, 0);
-        
-        // 确保图像不会被缩放
-        lv_obj_set_style_transform_scale(primary_img_obj_, 256, 0); // 256 = 100%
+
+        // 创建一个240x240的容器作为“视口”
+        lv_obj_t* container = lv_obj_create(prim_scr);
+        lv_obj_set_size(container, 240, 240);
+        lv_obj_set_pos(container, 0, 0);
+        lv_obj_set_style_radius(container, 0, 0);
+        lv_obj_set_style_border_width(container, 0, 0);
+        lv_obj_set_style_pad_all(container, 0, 0);
+        // 在 LVGL v9 中, lv_obj_create 默认就会裁剪溢出的子对象，
+        // 因此不需要额外添加裁剪标志，代码更简洁。
+
+        // 在容器内创建图像对象
+        primary_img_obj_ = lv_img_create(container);
     }
 
-    // 初始化副屏幕UI
+    // 初始化副屏幕UI (采用相同的逻辑)
     {
         DisplayLockGuard lock(secondary_display_);
         lv_obj_t* sec_scr = lv_disp_get_scr_act(secondary_display_->getLvDisplay());
         lv_obj_clean(sec_scr);
         lv_obj_set_style_bg_color(sec_scr, lv_color_black(), 0);
-        secondary_img_obj_ = lv_img_create(sec_scr);
-        
-        // 设置图像对象的确切尺寸和位置
-        lv_obj_set_size(secondary_img_obj_, 240, 240);
-        lv_obj_set_pos(secondary_img_obj_, 0, 0);
-        
-        // 确保图像不会被缩放
-        lv_obj_set_style_transform_scale(secondary_img_obj_, 256, 0); // 256 = 100%
+
+        // 为副屏幕创建容器
+        lv_obj_t* container = lv_obj_create(sec_scr);
+        lv_obj_set_size(container, 240, 240);
+        lv_obj_set_pos(container, 0, 0);
+        lv_obj_set_style_radius(container, 0, 0);
+        lv_obj_set_style_border_width(container, 0, 0);
+        lv_obj_set_style_pad_all(container, 0, 0);
+
+        // 在容器内创建图像对象
+        secondary_img_obj_ = lv_img_create(container);
     }
-    ESP_LOGI(TAG, "Dual screen UI initialized for eye animation.");
+    ESP_LOGI(TAG, "Dual screen UI initialized with clipping containers for eye animation.");
 }
+
+
+// void DualDisplayManager::SetImage(bool is_primary, const void* src) {
+//     Display* target_display = is_primary ? primary_display_ : secondary_display_;
+//     lv_obj_t* target_img_obj = is_primary ? primary_img_obj_ : secondary_img_obj_;
+    
+//     ESP_LOGI(TAG, "Setting image for %s display", is_primary ? "primary" : "secondary");
+    
+//     if (target_display && target_img_obj) {
+//         DisplayLockGuard lock(target_display);
+//         lv_img_set_src(target_img_obj, src);
+        
+//         // 获取图像对象的实际尺寸
+//         lv_coord_t width = lv_obj_get_width(target_img_obj);
+//         lv_coord_t height = lv_obj_get_height(target_img_obj);
+//         ESP_LOGI(TAG, "Image object size: %ldx%ld", width, height);
+        
+//         // 强制刷新显示
+//         lv_obj_invalidate(target_img_obj);
+//     } else {
+//         ESP_LOGE(TAG, "Failed to set image: display or image object is null");
+//     }
+// }
+
 
 void DualDisplayManager::SetImage(bool is_primary, const void* src) {
     Display* target_display = is_primary ? primary_display_ : secondary_display_;
@@ -173,15 +244,32 @@ void DualDisplayManager::SetImage(bool is_primary, const void* src) {
     
     if (target_display && target_img_obj) {
         DisplayLockGuard lock(target_display);
+        
+        // 1. 设置图像源，图像对象会自动调整为源图像的实际大小 (480x480)
         lv_img_set_src(target_img_obj, src);
         
-        // 获取图像对象的实际尺寸
-        lv_coord_t width = lv_obj_get_width(target_img_obj);
-        lv_coord_t height = lv_obj_get_height(target_img_obj);
-        ESP_LOGI(TAG, "Image object size: %ldx%ld", width, height);
+        // 2. 通过移动图像在240x240父容器内的位置，来选择要显示的“眼睛”
+        //    源图像尺寸为 480x480 像素。
+        
+        // 设置位置为(0, 0) 将显示左上角的眼睛
+        lv_obj_set_pos(target_img_obj, 0, 0);
+
+        /*
+         * --- 如何显示其他眼睛 ---
+         * 图像的坐标系原点(0,0)是左上角。
+         *
+         * 显示右上角的眼睛 (向左移动240像素): 
+         * lv_obj_set_pos(target_img_obj, -240, 0);
+         *
+         * 显示左下角的眼睛 (向上移动240像素): 
+         * lv_obj_set_pos(target_img_obj, 0, -240);
+         *
+         * 显示右下角的眼睛 (向左上移动240像素): 
+         * lv_obj_set_pos(target_img_obj, -240, -240);
+        */
         
         // 强制刷新显示
-        lv_obj_invalidate(target_img_obj);
+        lv_obj_invalidate(lv_obj_get_parent(target_img_obj));
     } else {
         ESP_LOGE(TAG, "Failed to set image: display or image object is null");
     }

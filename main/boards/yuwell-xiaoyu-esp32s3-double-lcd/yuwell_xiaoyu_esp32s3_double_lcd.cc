@@ -143,8 +143,33 @@ void YuwellXiaoyuEsp32S3BoardDoubleLcd::InitializeIot() {
 }
 
 // 动画测试函数
+// void YuwellXiaoyuEsp32S3BoardDoubleLcd::TestEyeAnimation() {
+//     ESP_LOGI(TAG, "开始双屏眼睛动画测试...");
+    
+//     DualDisplayManager* display_manager = GetDualDisplayManager();
+//     if (!display_manager) {
+//         ESP_LOGE(TAG, "Display manager not initialized!");
+//         return;
+//     }
+
+//     for (int i = 0; i < 5; ++i) {
+//         ESP_LOGI(TAG, "动画循环: %d - 左闭右睁", i + 1);
+//         display_manager->SetImage(true, &biyan_img);
+//         display_manager->SetImage(false, &zhenyan_img);
+//         vTaskDelay(pdMS_TO_TICKS(1500));
+
+//         ESP_LOGI(TAG, "动画循环: %d - 左睁右闭", i + 1);
+//         display_manager->SetImage(true, &zhenyan_img);
+//         display_manager->SetImage(false, &biyan_img);
+//         vTaskDelay(pdMS_TO_TICKS(1500));
+//     }
+
+//     ESP_LOGI(TAG, "双屏眼睛动画测试完成!");
+// }
+
+// 动画测试函数
 void YuwellXiaoyuEsp32S3BoardDoubleLcd::TestEyeAnimation() {
-    ESP_LOGI(TAG, "开始双屏眼睛动画测试...");
+    ESP_LOGI(TAG, "开始双屏交替眨眼动画...");
     
     DualDisplayManager* display_manager = GetDualDisplayManager();
     if (!display_manager) {
@@ -152,20 +177,31 @@ void YuwellXiaoyuEsp32S3BoardDoubleLcd::TestEyeAnimation() {
         return;
     }
 
-    for (int i = 0; i < 5; ++i) {
-        ESP_LOGI(TAG, "动画循环: %d - 左闭右睁", i + 1);
-        display_manager->SetImage(true, &biyan_img);
-        display_manager->SetImage(false, &zhenyan_img);
+    // 使用无限循环来持续播放动画
+    while (1) {
+        // 状态 1: 左眼睁开, 右眼闭合
+        ESP_LOGI(TAG, "动画状态: 左睁右闭");
+        display_manager->SetImage(true, &zhenyan_img); // true代表主屏幕(左眼), 设置为睁眼图片
+        display_manager->SetImage(false, &biyan_img);  // false代表副屏幕(右眼), 设置为闭眼图片
+        
+        // 等待1.5秒
         vTaskDelay(pdMS_TO_TICKS(1500));
 
-        ESP_LOGI(TAG, "动画循环: %d - 左睁右闭", i + 1);
-        display_manager->SetImage(true, &zhenyan_img);
-        display_manager->SetImage(false, &biyan_img);
+        // 状态 2: 左眼闭合, 右眼睁开
+        ESP_LOGI(TAG, "动画状态: 左闭右睁");
+        display_manager->SetImage(true, &biyan_img);   // true代表主屏幕(左眼), 设置为闭眼图片
+        display_manager->SetImage(false, &zhenyan_img);// false代表副屏幕(右眼), 设置为睁眼图片
+        
+        // 等待1.5秒
         vTaskDelay(pdMS_TO_TICKS(1500));
     }
 
+    // 下面的代码在无限循环中将不会被执行，但作为完整性保留
     ESP_LOGI(TAG, "双屏眼睛动画测试完成!");
 }
+
+
+
 
 // 重写的虚函数
 Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {

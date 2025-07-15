@@ -274,9 +274,9 @@ const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMAGE_ZHENYAN
 // };
 
 const lv_img_dsc_t zhenyan_img = {
-  .header.cf = LV_COLOR_FORMAT_ARGB8888,
+  .header.cf = LV_COLOR_FORMAT_RGB565,
   .header.w = 240,
   .header.h = 240,
-  .data_size = 230400,
+  .data_size = 57600 * 2,
   .data = zhenyan_map,
 };
