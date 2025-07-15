@@ -3,23 +3,31 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_io.h>
 #include <driver/spi_common.h>
-#include <vector> 
-#include <esp_lvgl_port.h>  
+#include <vector>
+#include <esp_lvgl_port.h>
+#include "config.h" // 确保包含了包含引脚定义的头文件
 
-// 添加字体声明
+// 添加字体声明 (尽管眼睛动画用不上，但保留着不会错)
 LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(font_awesome_16_4);
 
 static const char* TAG = "DualDisplayManager";
-//static bool lvgl_initialized = false;  // 添加全局标志
 
 DualDisplayManager::DualDisplayManager() 
-    : primary_display_(nullptr), secondary_display_(nullptr) {}
+    : primary_display_(nullptr), secondary_display_(nullptr),
+      primary_img_obj_(nullptr), secondary_img_obj_(nullptr) {
+}
 
 DualDisplayManager::~DualDisplayManager() {
-    if (primary_display_) delete primary_display_;
-    if (secondary_display_) delete secondary_display_;
-    // lvgl_port_deinit(); // 可以在这里反初始化LVGL
+    // 理论上，lvgl_port_deinit()会处理显示和对象的释放
+    // 但为了安全，我们手动删除
+    if (primary_display_) {
+        delete primary_display_;
+    }
+    if (secondary_display_) {
+        delete secondary_display_;
+    }
+    // 注意：如果您的程序有明确的退出流程，最后应调用 lvgl_port_deinit()
 }
 
 void DualDisplayManager::Initialize() {
@@ -38,6 +46,8 @@ void DualDisplayManager::Initialize() {
     ESP_LOGI(TAG, "Initializing LVGL core environment...");
     lv_init();
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    port_cfg.task_priority = 4; // 您可以根据需要调整任务优先级
+    port_cfg.timer_period_ms = 5;
     lvgl_port_init(&port_cfg);
 
     DisplayFonts fonts = {
@@ -46,7 +56,7 @@ void DualDisplayManager::Initialize() {
         .emoji_font = font_emoji_32_init(),
     };
     
-    // 3. 初始化主显示屏硬件并创建LVGL显示对象
+    // 3. 初始化并注册主显示屏 (左眼)
     ESP_LOGI(TAG, "Initializing Primary Display...");
     esp_lcd_panel_io_handle_t panel_io1;
     esp_lcd_panel_handle_t panel1;
@@ -79,11 +89,11 @@ void DualDisplayManager::Initialize() {
                                        DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                        fonts);
     
-    // 4. 初始化副显示屏硬件并创建LVGL显示对象
+    // 4. 初始化并注册副显示屏 (右眼)
     ESP_LOGI(TAG, "Initializing Secondary Display...");
     esp_lcd_panel_io_handle_t panel_io2;
     esp_lcd_panel_handle_t panel2;
-
+    
     esp_lcd_panel_io_spi_config_t io_config2 = {};
     io_config2.cs_gpio_num = DISPLAY2_CS_PIN;
     io_config2.dc_gpio_num = DISPLAY_DC_PIN;
@@ -95,7 +105,7 @@ void DualDisplayManager::Initialize() {
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config2, &panel_io2));
     
     esp_lcd_panel_dev_config_t panel_config2 = {};
-    panel_config2.reset_gpio_num = -1;
+    panel_config2.reset_gpio_num = -1; // 副屏通常不需要独立的复位引脚
     panel_config2.rgb_ele_order = DISPLAY_RGB_ORDER;
     panel_config2.bits_per_pixel = 16;
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io2, &panel_config2, &panel2));
@@ -110,67 +120,69 @@ void DualDisplayManager::Initialize() {
                                          DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, 
                                          DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY,
                                          fonts);
+
+    // 5. 初始化UI元素
+    InitializeUI();
 }
 
-
-
-void DualDisplayManager::ShowOnBoth(const char* message) {
-    if (primary_display_) primary_display_->SetStatus(message);
-    if (secondary_display_) secondary_display_->SetStatus(message);
-}
-
-void DualDisplayManager::ShowOnPrimary(const char* message) {
-    if (primary_display_) primary_display_->SetStatus(message);
-}
-
-void DualDisplayManager::ShowOnSecondary(const char* message) {
-    if (secondary_display_) secondary_display_->SetStatus(message);
-}
-
-void DualDisplayManager::SetDifferentContent(const char* primary_content, const char* secondary_content) {
-    if (primary_display_) primary_display_->SetStatus(primary_content);
-    if (secondary_display_) secondary_display_->SetStatus(secondary_content);
-}
-
-void DualDisplayManager::SetMirrorMode(bool enable) {
-    // 镜像模式实现 - 当enable为true时，副屏显示与主屏相同的内容
-    // 这里可以设置一个标志位，在其他显示方法中根据此标志决定是否同步显示
-    ESP_LOGI(TAG, "Mirror mode %s", enable ? "enabled" : "disabled");
-    // 具体实现可根据需求扩展
-}
-
-// 简单的双屏内容测试
-void DualDisplayManager::TestDifferentContent() {
-    ESP_LOGI(TAG, "开始双屏不同内容测试...");
-    
+void DualDisplayManager::InitializeUI() {
     if (!primary_display_ || !secondary_display_) {
-        ESP_LOGE(TAG, "显示屏未正确初始化");
+        ESP_LOGE(TAG, "Cannot initialize UI, displays are not ready.");
         return;
     }
 
-    ESP_LOGI(TAG, "在主屏幕上显示 '主屏幕'");
-    // 使用 DisplayLockGuard 来自动管理主屏幕的锁
+    // 初始化主屏幕UI
     {
         DisplayLockGuard lock(primary_display_);
         lv_obj_t* prim_scr = lv_disp_get_scr_act(primary_display_->getLvDisplay());
-        lv_obj_clean(prim_scr); // 清空屏幕
-        lv_obj_t* prim_label = lv_label_create(prim_scr);
-        lv_label_set_text(prim_label, "主屏幕");
-        lv_obj_center(prim_label);
-    } // lock 在这里被销毁，自动调用 Unlock()
+        lv_obj_clean(prim_scr);
+        lv_obj_set_style_bg_color(prim_scr, lv_color_black(), 0);
+        primary_img_obj_ = lv_img_create(prim_scr);
+        
+        // 设置图像对象的确切尺寸和位置
+        lv_obj_set_size(primary_img_obj_, 240, 240);
+        lv_obj_set_pos(primary_img_obj_, 0, 0);
+        
+        // 确保图像不会被缩放
+        lv_obj_set_style_transform_scale(primary_img_obj_, 256, 0); // 256 = 100%
+    }
 
-    ESP_LOGI(TAG, "在副屏幕上显示 '副屏幕'");
-    // 使用 DisplayLockGuard 来自动管理副屏幕的锁
+    // 初始化副屏幕UI
     {
         DisplayLockGuard lock(secondary_display_);
         lv_obj_t* sec_scr = lv_disp_get_scr_act(secondary_display_->getLvDisplay());
-        lv_obj_clean(sec_scr); // 清空屏幕
-        lv_obj_t* sec_label = lv_label_create(sec_scr);
-        lv_label_set_text(sec_label, "副屏幕");
-        lv_obj_center(sec_label);
-    } // lock 在这里被销毁，自动调用 Unlock()
+        lv_obj_clean(sec_scr);
+        lv_obj_set_style_bg_color(sec_scr, lv_color_black(), 0);
+        secondary_img_obj_ = lv_img_create(sec_scr);
+        
+        // 设置图像对象的确切尺寸和位置
+        lv_obj_set_size(secondary_img_obj_, 240, 240);
+        lv_obj_set_pos(secondary_img_obj_, 0, 0);
+        
+        // 确保图像不会被缩放
+        lv_obj_set_style_transform_scale(secondary_img_obj_, 256, 0); // 256 = 100%
+    }
+    ESP_LOGI(TAG, "Dual screen UI initialized for eye animation.");
+}
+
+void DualDisplayManager::SetImage(bool is_primary, const void* src) {
+    Display* target_display = is_primary ? primary_display_ : secondary_display_;
+    lv_obj_t* target_img_obj = is_primary ? primary_img_obj_ : secondary_img_obj_;
     
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    ESP_LOGI(TAG, "Setting image for %s display", is_primary ? "primary" : "secondary");
     
-    ESP_LOGI(TAG, "双屏不同内容测试完成!");
+    if (target_display && target_img_obj) {
+        DisplayLockGuard lock(target_display);
+        lv_img_set_src(target_img_obj, src);
+        
+        // 获取图像对象的实际尺寸
+        lv_coord_t width = lv_obj_get_width(target_img_obj);
+        lv_coord_t height = lv_obj_get_height(target_img_obj);
+        ESP_LOGI(TAG, "Image object size: %ldx%ld", width, height);
+        
+        // 强制刷新显示
+        lv_obj_invalidate(target_img_obj);
+    } else {
+        ESP_LOGE(TAG, "Failed to set image: display or image object is null");
+    }
 }

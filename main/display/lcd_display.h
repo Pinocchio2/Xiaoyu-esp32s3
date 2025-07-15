@@ -41,7 +41,10 @@ public:
 
     // Add theme switching function
     virtual void SetTheme(const std::string& theme_name) override;
-};
+    
+    // 添加获取容器的方法
+    lv_obj_t* GetContainer() { return container_; }
+};  
 
 // RGB LCD显示器
 class RgbLcdDisplay : public LcdDisplay {

@@ -396,6 +396,9 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
     lv_obj_center(low_battery_label_);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+
+    ESP_ERROR_CHECK(esp_timer_start_periodic(update_timer_, 1000000));
+    ESP_LOGI(TAG, "Display update timer started after UI initialization");
 }
 
 #define  MAX_MESSAGES 20

@@ -34,7 +34,7 @@ Display::Display() {
     };
     ESP_ERROR_CHECK(esp_timer_create(&notification_timer_args, &notification_timer_));
 
-    // Update display timer
+    // Update display timer - 创建但不启动
     esp_timer_create_args_t update_display_timer_args = {
         .callback = [](void *arg) {
             Display *display = static_cast<Display*>(arg);
@@ -46,7 +46,7 @@ Display::Display() {
         .skip_unhandled_events = true,
     };
     ESP_ERROR_CHECK(esp_timer_create(&update_display_timer_args, &update_timer_));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(update_timer_, 1000000));
+    // 注意：这里不启动定时器，将在UI初始化完成后启动
 
     // Create a power management lock
     auto ret = esp_pm_lock_create(ESP_PM_APB_FREQ_MAX, 0, "display_update", &pm_lock_);

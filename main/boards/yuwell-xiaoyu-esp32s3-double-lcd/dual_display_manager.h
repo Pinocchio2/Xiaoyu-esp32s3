@@ -8,17 +8,22 @@ class DualDisplayManager {
 private:
     LcdDisplay* primary_display_;
     LcdDisplay* secondary_display_;
+    lv_obj_t* primary_img_obj_;   // 新增：主屏幕的图像对象
+    lv_obj_t* secondary_img_obj_; // 新增：副屏幕的图像对象
     SpiLcdDisplay* CreateSpiLcdDisplayWithoutInit(
-        esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts);
+    esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, DisplayFonts fonts);
 public:
     DualDisplayManager();
     ~DualDisplayManager();
     
     void Initialize();
+    void InitializeUI(); // 新增UI初始化方法
+    void SetImage(bool is_primary, const void* src);
     
     // 获取显示屏
     Display* GetPrimaryDisplay() { return primary_display_; }
     Display* GetSecondaryDisplay() { return secondary_display_; }
+   
     
     // 双屏控制方法
     void ShowOnBoth(const char* message);
