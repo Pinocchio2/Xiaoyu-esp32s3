@@ -16,6 +16,10 @@
 #include <driver/gpio.h>
 #include <arpa/inet.h>
 
+// #include "boards/yuwell-xiaoyu-esp32s3-double-lcd/yuwell_xiaoyu_esp32s3_double_lcd.h"
+// extern const lv_img_dsc_t biyan_img;
+// extern const lv_img_dsc_t zhenyan_img;
+
 #define TAG "Application"
 
 
@@ -250,6 +254,23 @@ void Application::PlaySound(const std::string_view& sound) {
     }
 }
 
+////////////////////////////////////////////////// 新增：眼睛状态控制方法
+void Application::SetEyeState(bool awake) {
+    auto& board = Board::GetInstance();
+    
+    // 检查当前板卡是否支持眼睛动画
+    if (!board.SupportsEyeAnimation()) {
+        ESP_LOGD(TAG, "当前板卡不支持眼睛动画功能");
+        return;
+    }
+    
+    // 确保在主线程中执行 UI 操作
+    Schedule([&board, awake]() {
+        board.SetEyeState(awake);
+    });
+}
+
+
 void Application::ToggleChatState() {
     if (device_state_ == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
@@ -457,6 +478,10 @@ void Application::Start() {
     });
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveMode(true);
+
+        // //////////////////////////////////////会话结束时设置眼睛为闭眼状态
+        SetEyeState(false);
+
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
             display->SetChatMessage("system", "");
@@ -583,7 +608,12 @@ void Application::Start() {
 #if CONFIG_USE_WAKE_WORD_DETECT
     wake_word_detect_.Initialize(codec);
     wake_word_detect_.OnWakeWordDetected([this](const std::string& wake_word) {
-        Schedule([this, &wake_word]() {
+        ESP_LOGI(TAG, "Wake word detected: %s", wake_word.c_str());
+        
+        ////////////////////////////////////////// 语音唤醒后设置眼睛为睁眼状态
+        SetEyeState(true);
+        
+        Schedule([this, wake_word]() {
             if (device_state_ == kDeviceStateIdle) {
                 SetDeviceState(kDeviceStateConnecting);
                 wake_word_detect_.EncodeWakeWordData();
@@ -600,7 +630,6 @@ void Application::Start() {
                 }
                 // Set the chat state to wake word detected
                 protocol_->SendWakeWordDetected(wake_word);
-                ESP_LOGI(TAG, "Wake word detected: %s", wake_word.c_str());
                 SetListeningMode(realtime_chat_enabled_ ? kListeningModeRealtime : kListeningModeAutoStop);
             } else if (device_state_ == kDeviceStateSpeaking) {
                 AbortSpeaking(kAbortReasonWakeWordDetected);
@@ -855,6 +884,9 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
             display->SetEmotion("neutral");
+            // 空闲状态设置闭眼
+            SetEyeState(false);
+
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
 #endif
@@ -866,10 +898,14 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("neutral");
             display->SetChatMessage("system", "");
+            // 连接状态设置闭眼
+            SetEyeState(false);
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
+            // 倾听状态设置睁眼
+            SetEyeState(true);
 
             // Update the IoT states before sending the start listening command
             UpdateIotStates();
@@ -897,6 +933,10 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
+
+            // 说话状态设置闭眼
+            SetEyeState(false);
+
 
             if (listening_mode_ != kListeningModeRealtime) {
 #if CONFIG_USE_AUDIO_PROCESSOR
@@ -1142,3 +1182,31 @@ void Application::UartListenTask() {
     }
     free(buffer);
 }
+
+//眼睛控制方法
+// void Application::SetEyeState(bool awake) {
+//     auto& board = Board::GetInstance();
+    
+//     // 尝试转换为双屏板卡类型
+//     auto* double_lcd_board = dynamic_cast<YuwellXiaoyuEsp32S3BoardDoubleLcd*>(&board);
+//     if (double_lcd_board) {
+//         auto* display_manager = double_lcd_board->GetDualDisplayManager();
+//         if (display_manager) {
+//             if (awake) {
+//                 // 唤醒状态：两个屏幕都显示睁眼
+//                 ESP_LOGI(TAG, "Setting eyes to awake state");
+//                 display_manager->SetImage(true, &zhenyan_img);   // 主屏幕睁眼
+//                 display_manager->SetImage(false, &zhenyan_img);  // 副屏幕睁眼
+//             } else {
+//                 // 休眠状态：两个屏幕都显示闭眼
+//                 ESP_LOGI(TAG, "Setting eyes to sleep state");
+//                 display_manager->SetImage(true, &biyan_img);     // 主屏幕闭眼
+//                 display_manager->SetImage(false, &biyan_img);    // 副屏幕闭眼
+//             }
+//         } else {
+//             ESP_LOGW(TAG, "DualDisplayManager not available");
+//         }
+//     } else {
+//         ESP_LOGW(TAG, "Current board does not support dual display");
+//     }
+// }

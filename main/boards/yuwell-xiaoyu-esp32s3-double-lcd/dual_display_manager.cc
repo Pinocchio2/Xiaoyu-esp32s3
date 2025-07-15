@@ -174,7 +174,7 @@ void DualDisplayManager::InitializeUI() {
     {
         DisplayLockGuard lock(primary_display_);
         lv_obj_t* prim_scr = lv_disp_get_scr_act(primary_display_->getLvDisplay());
-        lv_obj_clean(prim_scr);
+        //lv_obj_clean(prim_scr);
         lv_obj_set_style_bg_color(prim_scr, lv_color_black(), 0);
 
         // 创建一个240x240的容器作为“视口”
@@ -195,7 +195,7 @@ void DualDisplayManager::InitializeUI() {
     {
         DisplayLockGuard lock(secondary_display_);
         lv_obj_t* sec_scr = lv_disp_get_scr_act(secondary_display_->getLvDisplay());
-        lv_obj_clean(sec_scr);
+        //lv_obj_clean(sec_scr);
         lv_obj_set_style_bg_color(sec_scr, lv_color_black(), 0);
 
         // 为副屏幕创建容器

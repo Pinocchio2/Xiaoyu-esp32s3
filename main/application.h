@@ -74,6 +74,8 @@ public:
     void WakeWordInvoke(const std::string& wake_word);
     void PlaySound(const std::string_view& sound);
     bool CanEnterSleepMode();
+    //新增控制眼睛状态
+    void SetEyeState(bool awake);
 
 private:
     Application();
