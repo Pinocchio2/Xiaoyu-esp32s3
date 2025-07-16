@@ -35,7 +35,7 @@
 #define LIGHT_BORDER_COLOR           lv_color_hex(0xE0E0E0)     // Light gray border
 #define LIGHT_LOW_BATTERY_COLOR      lv_color_black()           // Black for light mode
 
-// Theme color structure
+
 struct ThemeColors {
     lv_color_t background;
     lv_color_t text;
@@ -668,11 +668,13 @@ void LcdDisplay::SetupUI() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
+    // 定义一个结构体，包含表情的图标和文字
     struct Emotion {
         const char* icon;
         const char* text;
     };
 
+    // 定义一个静态的包含所有表情的向量
     static const std::vector<Emotion> emotions = {
         {"😶", "neutral"},
         {"🙂", "happy"},
@@ -702,6 +704,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
     auto it = std::find_if(emotions.begin(), emotions.end(),
         [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
 
+    // 锁定显示
     DisplayLockGuard lock(this);
     if (emotion_label_ == nullptr) {
         return;

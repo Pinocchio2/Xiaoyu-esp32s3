@@ -14,6 +14,9 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
 #include "dual_display_manager.h"
+
+
+#include "display/eye_display.h"  // 新增：眼睛显示类
 #include <cJSON.h>
 // #include "yuwell_xiaoyu_esp32s3_double_lcd.h"
 #include "ui/eye.h"  //  // 新的眼睛图案头文件
@@ -33,6 +36,8 @@ private:
     Button wifi_switch_button_;
     DualDisplayManager dual_display_manager_;
 
+    EyeDisplay* eye_display_; // 新增：眼睛显示对象
+
     // 私有初始化函数的声明
     void InitUart();
     void InitializeI2cBus();
@@ -42,19 +47,19 @@ private:
 public:
     // 构造函数
     YuwellXiaoyuEsp32S3BoardDoubleLcd();
+    ~YuwellXiaoyuEsp32S3BoardDoubleLcd();
 
-    // 动画测试函数的声明
-    //void TestEyeAnimation();
+    
 
     // 重写的虚函数声明
     virtual Display* GetDisplay() override;
     virtual AudioCodec* GetAudioCodec() override;
 
-     // 新增：重写眼睛状态控制方法
+    // 眼睛状态控制方法（保持兼容性）
     virtual void SetEyeState(bool awake) override;
     virtual bool SupportsEyeAnimation() const override;
-
-    // 获取显示管理器的函数声明
+    
+    // 获取显示管理器（如果需要直接访问）
     DualDisplayManager* GetDualDisplayManager();
 };
 
@@ -68,18 +73,20 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     wifi_switch_button_(NETWORK_SWITCH_BUTTON_GPIO) 
 {  
     InitializeI2cBus();
-    dual_display_manager_.Initialize();
     InitUart();
     InitializeButtons();
     InitializeIot();
 
-    ESP_LOGI(TAG, "Board initialization complete. Starting eye animation test...");
+   // 显示系统初始化 - 重构重点
+    dual_display_manager_.Initialize();
     
-    // 新增：设置初始闭眼状态
-    ESP_LOGI(TAG, "设置初始闭眼状态...");
-    SetEyeState(false);  // 启动时显示闭眼状态
+    // 创建统一的 EyeDisplay 接口
+    eye_display_ = new EyeDisplay(&dual_display_manager_);
     
-    // TestEyeAnimation(); // 如果需要测试动画可以取消注释
+    ESP_LOGI(TAG, "Board initialization complete.");
+    
+    // 使用统一接口设置初始表情
+    eye_display_->SetEmotion("closed_eyes");  // 替代原来的 SetEyeState(false)
 }
 
 // 初始化串口
@@ -154,76 +161,6 @@ void YuwellXiaoyuEsp32S3BoardDoubleLcd::InitializeIot() {
 }
 
 
-
-
-
-
-
-// 动画测试函数
-// void YuwellXiaoyuEsp32S3BoardDoubleLcd::TestEyeAnimation() {
-//     ESP_LOGI(TAG, "开始双屏眼睛动画测试...");
-    
-//     DualDisplayManager* display_manager = GetDualDisplayManager();
-//     if (!display_manager) {
-//         ESP_LOGE(TAG, "Display manager not initialized!");
-//         return;
-//     }
-
-//     for (int i = 0; i < 5; ++i) {
-//         ESP_LOGI(TAG, "动画循环: %d - 左闭右睁", i + 1);
-//         display_manager->SetImage(true, &biyan_img);
-//         display_manager->SetImage(false, &zhenyan_img);
-//         vTaskDelay(pdMS_TO_TICKS(1500));
-
-//         ESP_LOGI(TAG, "动画循环: %d - 左睁右闭", i + 1);
-//         display_manager->SetImage(true, &zhenyan_img);
-//         display_manager->SetImage(false, &biyan_img);
-//         vTaskDelay(pdMS_TO_TICKS(1500));
-//     }
-
-//     ESP_LOGI(TAG, "双屏眼睛动画测试完成!");
-// }
-
-// 动画测试函数
-// void YuwellXiaoyuEsp32S3BoardDoubleLcd::TestEyeAnimation() {
-//     ESP_LOGI(TAG, "开始双屏交替眨眼动画...");
-    
-//     DualDisplayManager* display_manager = GetDualDisplayManager();
-//     if (!display_manager) {
-//         ESP_LOGE(TAG, "Display manager not initialized!");
-//         return;
-//     }
-
-//     // 使用无限循环来持续播放动画
-//     while (1) {
-//         // 状态 1: 左眼睁开, 右眼闭合
-//         ESP_LOGI(TAG, "动画状态: 左睁右闭");
-//         display_manager->SetImage(true, &zhenyan_img); 
-//         display_manager->SetImage(false, &biyan_img);  
-        
-//         // 等待1.5秒
-//         vTaskDelay(pdMS_TO_TICKS(1500));
-
-//         // 状态 2: 左眼闭合, 右眼睁开
-//         ESP_LOGI(TAG, "动画状态: 左闭右睁");
-//         display_manager->SetImage(true, &biyan_img);   
-//         display_manager->SetImage(false, &zhenyan_img);
-        
-//         // 等待1.5秒
-//         vTaskDelay(pdMS_TO_TICKS(1500));
-//     }
-
-//     // 下面的代码在无限循环中将不会被执行，但作为完整性保留
-//     ESP_LOGI(TAG, "双屏眼睛动画测试完成!");
-// }
-
-
-
-
-// 重写的虚函数
-Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
-    return dual_display_manager_.GetPrimaryDisplay();
-}
     
 DualDisplayManager* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDualDisplayManager() {
     return &dual_display_manager_;
@@ -235,22 +172,35 @@ AudioCodec* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetAudioCodec() {
         AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR);
     return &audio_codec;
 }
+
+Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
+    // 返回 EyeDisplay 对象，提供统一的显示接口
+    return eye_display_;
+}
+
+
 // 新增：重写眼睛状态控制方法
 void YuwellXiaoyuEsp32S3BoardDoubleLcd::SetEyeState(bool awake) {
-    if (awake) {
-        // 睁眼
-        dual_display_manager_.SetImage(false, &zhenyan_img);
-        dual_display_manager_.SetImage(true, &zhenyan_img);
-    } else {
-        // 闭眼
-        dual_display_manager_.SetImage(false, &biyan_img);
-        dual_display_manager_.SetImage(true, &biyan_img);
+    if (eye_display_) {
+        if (awake) {
+            // 使用表情管理器设置睁眼表情
+            eye_display_->SetEmotion("open_eyes");
+        } else {
+            // 使用表情管理器设置闭眼表情
+            eye_display_->SetEmotion("closed_eyes");
+        }
     }
 }
 
 bool YuwellXiaoyuEsp32S3BoardDoubleLcd::SupportsEyeAnimation() const {
     return true;  // 双屏板卡支持眼睛动画
 }
-
+YuwellXiaoyuEsp32S3BoardDoubleLcd::~YuwellXiaoyuEsp32S3BoardDoubleLcd() {
+    // 清理 EyeDisplay 资源
+    if (eye_display_) {
+        delete eye_display_;
+        eye_display_ = nullptr;
+    }
+}
 // --- DECLARE_BOARD 宏 ---
 DECLARE_BOARD(YuwellXiaoyuEsp32S3BoardDoubleLcd);

@@ -1,0 +1,124 @@
+#include "emotion_manager.h"
+#include <esp_log.h>
+
+const char* EmotionManager::TAG = "EmotionManager";
+
+EmotionManager::EmotionManager() 
+    : default_animation_("neutral", false) {
+    // 在构造函数中初始化默认动画
+    default_animation_.AddFrame(&zhenyan_img, &zhenyan_img, 0);  // 静态睁眼表情
+}
+
+const Animation& EmotionManager::GetAnimation(const std::string& emotion_name) {
+    auto it = animations_.find(emotion_name);
+    if (it != animations_.end()) {
+        ESP_LOGD(TAG, "找到表情动画: %s", emotion_name.c_str());
+        return it->second;
+    }
+    
+    ESP_LOGW(TAG, "未找到表情动画 '%s'，使用默认中性表情", emotion_name.c_str());
+    return default_animation_;
+}
+
+void EmotionManager::PreloadAllAnimations() {
+    // 打印开始预加载所有表情动画的日志信息
+    ESP_LOGI(TAG, "开始预加载所有表情动画...");
+    // 初始化表情动画
+    InitializeAnimations();
+    // 打印表情动画预加载完成的日志信息，并输出加载的动画数量
+    ESP_LOGI(TAG, "表情动画预加载完成，共加载 %d 个动画", animations_.size());
+}
+
+void EmotionManager::RegisterAnimation(const std::string& emotion_name, const Animation& animation) {
+    // 检查动画是否有效
+    if (!animation.IsValid()) {
+        // 如果无效，则输出错误日志
+        ESP_LOGE(TAG, "尝试注册无效的动画: %s", emotion_name.c_str());
+        return;
+    }
+    
+    // 将动画注册到animations_中
+    animations_[emotion_name] = animation;
+    // 输出注册成功的日志
+    ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.frames.size());
+}
+
+// 检查emotion_name是否存在于animations_中
+bool EmotionManager::HasAnimation(const std::string& emotion_name) const {
+    // 如果animations_中存在emotion_name，则返回true，否则返回false
+    return animations_.find(emotion_name) != animations_.end();
+}
+
+const Animation& EmotionManager::GetDefaultAnimation() const {
+    return default_animation_;
+}
+
+void EmotionManager::InitializeAnimations() {
+    // 基础静态表情
+    RegisterAnimation("neutral", CreateStaticEmotion("neutral", &zhenyan_img, &zhenyan_img));
+    RegisterAnimation("happy", CreateStaticEmotion("happy", &happy_img, &happy_img));
+    RegisterAnimation("sad", CreateStaticEmotion("sad", &crying_l_img, &crying_r_img));
+    RegisterAnimation("funny", CreateStaticEmotion("funny", &funny_img, &funny_img));
+    RegisterAnimation("sleepy", CreateStaticEmotion("sleepy", &biyan_img, &biyan_img));
+    
+    // 对称表情（左右眼相同）
+    RegisterAnimation("laughing", CreateStaticEmotion("laughing", &funny_img, &funny_img));
+    RegisterAnimation("angry", CreateStaticEmotion("angry", &neutral_img, &neutral_img));  // 暂时用neutral代替
+    RegisterAnimation("crying", CreateStaticEmotion("crying", &crying_l_img, &crying_r_img));
+    RegisterAnimation("loving", CreateStaticEmotion("loving", &happy_img, &happy_img));  // 暂时用happy代替
+    RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral_img, &neutral_img));
+    RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan_img, &zhenyan_img));
+    RegisterAnimation("shocked", CreateStaticEmotion("shocked", &zhenyan_img, &zhenyan_img));
+    RegisterAnimation("thinking", CreateStaticEmotion("thinking", &neutral_img, &neutral_img));
+    RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral_img, &neutral_img));
+    RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan_img, &biyan_img));
+    RegisterAnimation("delicious", CreateStaticEmotion("delicious", &happy_img, &happy_img));
+    RegisterAnimation("kissy", CreateStaticEmotion("kissy", &happy_img, &happy_img));
+    RegisterAnimation("confident", CreateStaticEmotion("confident", &zhenyan_img, &zhenyan_img));
+    RegisterAnimation("silly", CreateStaticEmotion("silly", &funny_img, &funny_img));
+    RegisterAnimation("confused", CreateStaticEmotion("confused", &neutral_img, &neutral_img));
+    
+    // 特殊动画：眨眼（左眼眨，右眼睁开）
+    RegisterAnimation("winking", CreateWinkingAnimation());
+    
+    // 特殊动画：眨眼循环
+    RegisterAnimation("blinking", CreateBlinkingAnimation());
+}
+
+Animation EmotionManager::CreateStaticEmotion(const std::string& name, 
+                                            const lv_img_dsc_t* left_eye, 
+                                            const lv_img_dsc_t* right_eye) {
+    Animation animation(name, false);
+    animation.AddFrame(left_eye, right_eye, 0);  // 持续时间为0表示静态显示
+    return animation;
+}
+
+Animation EmotionManager::CreateDynamicEmotion(const std::string& name, 
+                                             const std::vector<AnimationFrame>& frames, 
+                                             bool loop) {
+    Animation animation(name, loop);
+    for (const auto& frame : frames) {
+        animation.frames.push_back(frame);
+    }
+    return animation;
+}
+
+// 创建眨眼动画的私有方法
+Animation EmotionManager::CreateWinkingAnimation() {
+    Animation animation("winking", false);
+    // 左眼眨，右眼睁开，持续500ms
+    animation.AddFrame(&biyan_img, &zhenyan_img, 500);
+    // 恢复双眼睁开
+    animation.AddFrame(&zhenyan_img, &zhenyan_img, 0);
+    return animation;
+}
+
+// 创建眨眼循环动画的私有方法
+Animation EmotionManager::CreateBlinkingAnimation() {
+    Animation animation("blinking", true);  // 循环播放
+    // 双眼睁开，持续3秒
+    animation.AddFrame(&zhenyan_img, &zhenyan_img, 3000);
+    // 双眼闭合，持续200ms
+    animation.AddFrame(&biyan_img, &biyan_img, 200);
+    return animation;
+}

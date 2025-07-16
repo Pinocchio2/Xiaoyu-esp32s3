@@ -26,6 +26,13 @@ public:
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void SetIcon(const char* icon);
     virtual void SetTheme(const std::string& theme_name);
+    
+    virtual bool PlayAnimation(const Animation& animation) = 0;
+
+// 修改现有的 SetEmotion 方法，使其调用 EmotionManager
+    virtual void SetEmotion(const char* emotion) override;
+
+
     virtual std::string GetTheme() { return current_theme_name_; }
 
     

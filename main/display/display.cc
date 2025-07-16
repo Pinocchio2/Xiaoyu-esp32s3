@@ -11,6 +11,8 @@
 #include "audio_codec.h"
 #include "settings.h"
 #include "assets/lang_config.h"
+// 在文件顶部添加包含
+#include "emotion_manager.h"
 
 #define TAG "Display"
 
@@ -193,53 +195,77 @@ void Display::Update() {
 }
 
 
+// void Display::SetEmotion(const char* emotion) {
+//     // 定义一个结构体，包含表情的图标和文本
+//     struct Emotion {
+//         const char* icon;
+//         const char* text;
+//     };
+
+//     // 定义一个静态的向量，包含所有表情
+//     static const std::vector<Emotion> emotions = {
+//         {FONT_AWESOME_EMOJI_NEUTRAL, "neutral"},
+//         {FONT_AWESOME_EMOJI_HAPPY, "happy"},
+//         {FONT_AWESOME_EMOJI_LAUGHING, "laughing"},
+//         {FONT_AWESOME_EMOJI_FUNNY, "funny"},
+//         {FONT_AWESOME_EMOJI_SAD, "sad"},
+//         {FONT_AWESOME_EMOJI_ANGRY, "angry"},
+//         {FONT_AWESOME_EMOJI_CRYING, "crying"},
+//         {FONT_AWESOME_EMOJI_LOVING, "loving"},
+//         {FONT_AWESOME_EMOJI_EMBARRASSED, "embarrassed"},
+//         {FONT_AWESOME_EMOJI_SURPRISED, "surprised"},
+//         {FONT_AWESOME_EMOJI_SHOCKED, "shocked"},
+//         {FONT_AWESOME_EMOJI_THINKING, "thinking"},
+//         {FONT_AWESOME_EMOJI_WINKING, "winking"},
+//         {FONT_AWESOME_EMOJI_COOL, "cool"},
+//         {FONT_AWESOME_EMOJI_RELAXED, "relaxed"},
+//         {FONT_AWESOME_EMOJI_DELICIOUS, "delicious"},
+//         {FONT_AWESOME_EMOJI_KISSY, "kissy"},
+//         {FONT_AWESOME_EMOJI_CONFIDENT, "confident"},
+//         {FONT_AWESOME_EMOJI_SLEEPY, "sleepy"},
+//         {FONT_AWESOME_EMOJI_SILLY, "silly"},
+//         {FONT_AWESOME_EMOJI_CONFUSED, "confused"}
+//     };
+    
+//     // 查找匹配的表情
+//     std::string_view emotion_view(emotion);
+//     auto it = std::find_if(emotions.begin(), emotions.end(),
+//         [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
+    
+//     // 加锁，防止多线程同时操作
+//     DisplayLockGuard lock(this);
+//     if (emotion_label_ == nullptr) {
+//         return;
+//     }
+
+//     // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
+//     if (it != emotions.end()) {
+//         lv_label_set_text(emotion_label_, it->icon);
+//     } else {
+//         lv_label_set_text(emotion_label_, FONT_AWESOME_EMOJI_NEUTRAL);
+//     }
+// }
+
+
+// 修改 SetEmotion 方法的实现
 void Display::SetEmotion(const char* emotion) {
-    struct Emotion {
-        const char* icon;
-        const char* text;
-    };
-
-    static const std::vector<Emotion> emotions = {
-        {FONT_AWESOME_EMOJI_NEUTRAL, "neutral"},
-        {FONT_AWESOME_EMOJI_HAPPY, "happy"},
-        {FONT_AWESOME_EMOJI_LAUGHING, "laughing"},
-        {FONT_AWESOME_EMOJI_FUNNY, "funny"},
-        {FONT_AWESOME_EMOJI_SAD, "sad"},
-        {FONT_AWESOME_EMOJI_ANGRY, "angry"},
-        {FONT_AWESOME_EMOJI_CRYING, "crying"},
-        {FONT_AWESOME_EMOJI_LOVING, "loving"},
-        {FONT_AWESOME_EMOJI_EMBARRASSED, "embarrassed"},
-        {FONT_AWESOME_EMOJI_SURPRISED, "surprised"},
-        {FONT_AWESOME_EMOJI_SHOCKED, "shocked"},
-        {FONT_AWESOME_EMOJI_THINKING, "thinking"},
-        {FONT_AWESOME_EMOJI_WINKING, "winking"},
-        {FONT_AWESOME_EMOJI_COOL, "cool"},
-        {FONT_AWESOME_EMOJI_RELAXED, "relaxed"},
-        {FONT_AWESOME_EMOJI_DELICIOUS, "delicious"},
-        {FONT_AWESOME_EMOJI_KISSY, "kissy"},
-        {FONT_AWESOME_EMOJI_CONFIDENT, "confident"},
-        {FONT_AWESOME_EMOJI_SLEEPY, "sleepy"},
-        {FONT_AWESOME_EMOJI_SILLY, "silly"},
-        {FONT_AWESOME_EMOJI_CONFUSED, "confused"}
-    };
-    
-    // 查找匹配的表情
-    std::string_view emotion_view(emotion);
-    auto it = std::find_if(emotions.begin(), emotions.end(),
-        [&emotion_view](const Emotion& e) { return e.text == emotion_view; });
-    
-    DisplayLockGuard lock(this);
-    if (emotion_label_ == nullptr) {
-        return;
+    if (emotion == nullptr) {
+        ESP_LOGW("Display", "表情名称为空，使用默认表情");
+        emotion = "neutral";
     }
-
-    // 如果找到匹配的表情就显示对应图标，否则显示默认的neutral表情
-    if (it != emotions.end()) {
-        lv_label_set_text(emotion_label_, it->icon);
-    } else {
-        lv_label_set_text(emotion_label_, FONT_AWESOME_EMOJI_NEUTRAL);
+    
+    // 从 EmotionManager 获取动画
+    const Animation& animation = EmotionManager::GetInstance().GetAnimation(std::string(emotion));
+    
+    // 调用子类实现的 PlayAnimation 方法
+    if (!PlayAnimation(animation)) {
+        ESP_LOGE("Display", "播放表情动画失败: %s", emotion);
+        // 尝试播放默认动画
+        PlayAnimation(EmotionManager::GetInstance().GetDefaultAnimation());
     }
 }
+
+
 
 void Display::SetIcon(const char* icon) {
     DisplayLockGuard lock(this);
