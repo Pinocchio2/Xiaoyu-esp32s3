@@ -18,11 +18,14 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "settings.cc"
             "background_task.cc"
             "main.cc"
-            "biyan.c"      
-            "zhenyan.c" 
             )
 
-set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing")
+set(INCLUDE_DIRS "." "display" "audio_codecs" "protocols" "audio_processing" "ui")
+
+# 添加 UI 相关文件
+file(GLOB UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/ui/*.c)
+list(APPEND SOURCES ${UI_SOURCES})
+
 
 # 添加 IOT 相关文件
 file(GLOB IOT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/iot/things/*.cc)

@@ -15,10 +15,12 @@
 #include <esp_lcd_panel_vendor.h>
 #include "dual_display_manager.h"
 #include <cJSON.h>
+// #include "yuwell_xiaoyu_esp32s3_double_lcd.h"
+#include "ui/eye.h"  //  // 新的眼睛图案头文件
 
 // LVGL 图片声明
-LV_IMG_DECLARE(biyan_img);
-LV_IMG_DECLARE(zhenyan_img);
+// LV_IMG_DECLARE(biyan_img);
+// LV_IMG_DECLARE(zhenyan_img);
 
 #define TAG "yuwell-xiaoyu-esp32s3-double-lcd"
 
@@ -235,22 +237,14 @@ AudioCodec* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetAudioCodec() {
 }
 // 新增：重写眼睛状态控制方法
 void YuwellXiaoyuEsp32S3BoardDoubleLcd::SetEyeState(bool awake) {
-    ESP_LOGI(TAG, "设置眼睛状态: %s", awake ? "睁眼" : "闭眼");
-    
-    DualDisplayManager* display_manager = GetDualDisplayManager();
-    if (!display_manager) {
-        ESP_LOGE(TAG, "DualDisplayManager 未初始化!");
-        return;
-    }
-    
     if (awake) {
-        // 睁眼状态：两个屏幕都显示睁眼图像
-        display_manager->SetImage(true, &zhenyan_img);   // 主屏幕（左眼）
-        display_manager->SetImage(false, &zhenyan_img);  // 副屏幕（右眼）
+        // 睁眼
+        dual_display_manager_.SetImage(false, &zhenyan_img);
+        dual_display_manager_.SetImage(true, &zhenyan_img);
     } else {
-        // 闭眼状态：两个屏幕都显示闭眼图像
-        display_manager->SetImage(true, &biyan_img);     // 主屏幕（左眼）
-        display_manager->SetImage(false, &biyan_img);    // 副屏幕（右眼）
+        // 闭眼
+        dual_display_manager_.SetImage(false, &biyan_img);
+        dual_display_manager_.SetImage(true, &biyan_img);
     }
 }
 
