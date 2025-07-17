@@ -15,6 +15,7 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
+#include "display/emotion_manager.h"
 
 // #include "boards/yuwell-xiaoyu-esp32s3-double-lcd/yuwell_xiaoyu_esp32s3_double_lcd.h"
 // extern const lv_img_dsc_t biyan_img;
@@ -395,6 +396,9 @@ void Application::Start() {
 
     /* Setup the display */
     auto display = board.GetDisplay();
+    
+    // 初始化表情动画 - 添加这一行
+    EmotionManager::GetInstance().PreloadAllAnimations();
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
@@ -885,7 +889,7 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetStatus(Lang::Strings::STANDBY);
             display->SetEmotion("neutral");
             // 空闲状态设置闭眼
-            SetEyeState(false);
+            //SetEyeState(false);
 
 #if CONFIG_USE_AUDIO_PROCESSOR
             audio_processor_.Stop();
@@ -903,9 +907,9 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("neutral");
+            display->SetEmotion("listen");
             // 倾听状态设置睁眼
-            SetEyeState(true);
+            //SetEyeState(true);
 
             // Update the IoT states before sending the start listening command
             UpdateIotStates();
@@ -933,9 +937,10 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
+            display->SetEmotion("funny");
 
             // 说话状态设置闭眼
-            SetEyeState(false);
+           // SetEyeState(false);
 
 
             if (listening_mode_ != kListeningModeRealtime) {

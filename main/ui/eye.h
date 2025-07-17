@@ -4,15 +4,15 @@
 #include "lvgl.h"
 
 // 声明所有眼睛图案
-extern const lv_img_dsc_t biyan_img;
-extern const lv_img_dsc_t zhenyan_img;
-extern const lv_img_dsc_t crying_l_img;
-extern const lv_img_dsc_t crying_r_img;
-extern const lv_img_dsc_t funny_img;
-extern const lv_img_dsc_t happy_img;
-extern const lv_img_dsc_t listen_l_img;
-extern const lv_img_dsc_t listen_r_img;
-extern const lv_img_dsc_t neutral_img;
+extern const lv_img_dsc_t biyan;
+extern const lv_img_dsc_t zhenyan;
+extern const lv_img_dsc_t crying_l;
+extern const lv_img_dsc_t crying_r;
+extern const lv_img_dsc_t funny;
+extern const lv_img_dsc_t happy;
+extern const lv_img_dsc_t listen_l;
+extern const lv_img_dsc_t listen_r;
+extern const lv_img_dsc_t neutral;
 
 // 新增眨眼动画帧声明
 extern lv_image_dsc_t zhayang1;

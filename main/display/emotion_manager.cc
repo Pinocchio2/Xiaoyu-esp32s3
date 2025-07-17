@@ -6,7 +6,7 @@ const char* EmotionManager::TAG = "EmotionManager";
 EmotionManager::EmotionManager() 
     : default_animation_("blinking", true) {  // 改为眨眼动画作为默认S
     // 在构造函数中初始化默认眨眼动画
-    default_animation_.AddFrame(&zhenyan_img, &zhenyan_img, 2000);    // 睁眼 2秒
+    default_animation_.AddFrame(&zhenyan, &zhenyan, 2000);    // 睁眼 2秒
     default_animation_.AddFrame(&zhayang1, &zhayang1, 100);   // 眨眼帧1 100ms
     default_animation_.AddFrame(&zhayang2, &zhayang2, 100);   // 眨眼帧2 100ms
     default_animation_.AddFrame(&zhayang3, &zhayang3, 100);   // 眨眼帧3 100ms
@@ -62,28 +62,31 @@ const Animation& EmotionManager::GetDefaultAnimation() const {
 
 void EmotionManager::InitializeAnimations() {
     // 基础静态表情
-    RegisterAnimation("neutral", CreateStaticEmotion("neutral", &zhenyan_img, &zhenyan_img));
-    RegisterAnimation("happy", CreateStaticEmotion("happy", &happy_img, &happy_img));
-    RegisterAnimation("sad", CreateStaticEmotion("sad", &crying_l_img, &crying_r_img));
-    RegisterAnimation("funny", CreateStaticEmotion("funny", &funny_img, &funny_img));
-    RegisterAnimation("sleepy", CreateStaticEmotion("sleepy", &biyan_img, &biyan_img));
+    RegisterAnimation("neutral", CreateStaticEmotion("neutral", &zhenyan , &zhenyan ));
+    RegisterAnimation("happy", CreateStaticEmotion("happy", &happy, &happy));
+    RegisterAnimation("sad", CreateStaticEmotion("sad", &crying_l, &crying_r));
+    RegisterAnimation("funny", CreateStaticEmotion("funny", &funny, &funny));
+    RegisterAnimation("sleepy", CreateStaticEmotion("sleepy", &biyan , &biyan ));
+    
+    // 添加listen表情
+    RegisterAnimation("listen", CreateStaticEmotion("listen", &listen_l, &listen_r));
     
     // 对称表情（左右眼相同）
-    RegisterAnimation("laughing", CreateStaticEmotion("laughing", &funny_img, &funny_img));
-    RegisterAnimation("angry", CreateStaticEmotion("angry", &neutral_img, &neutral_img));  // 暂时用neutral代替
-    RegisterAnimation("crying", CreateStaticEmotion("crying", &crying_l_img, &crying_r_img));
-    RegisterAnimation("loving", CreateStaticEmotion("loving", &happy_img, &happy_img));  // 暂时用happy代替
-    RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral_img, &neutral_img));
-    RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan_img, &zhenyan_img));
-    RegisterAnimation("shocked", CreateStaticEmotion("shocked", &zhenyan_img, &zhenyan_img));
-    RegisterAnimation("thinking", CreateStaticEmotion("thinking", &neutral_img, &neutral_img));
-    RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral_img, &neutral_img));
-    RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan_img, &biyan_img));
-    RegisterAnimation("delicious", CreateStaticEmotion("delicious", &happy_img, &happy_img));
-    RegisterAnimation("kissy", CreateStaticEmotion("kissy", &happy_img, &happy_img));
-    RegisterAnimation("confident", CreateStaticEmotion("confident", &zhenyan_img, &zhenyan_img));
-    RegisterAnimation("silly", CreateStaticEmotion("silly", &funny_img, &funny_img));
-    RegisterAnimation("confused", CreateStaticEmotion("confused", &neutral_img, &neutral_img));
+    RegisterAnimation("laughing", CreateStaticEmotion("laughing", &funny, &funny));
+    RegisterAnimation("angry", CreateStaticEmotion("angry", &neutral, &neutral));  // 暂时用neutral代替
+    RegisterAnimation("crying", CreateStaticEmotion("crying", &crying_l, &crying_r));
+    RegisterAnimation("loving", CreateStaticEmotion("loving", &happy, &happy));  // 暂时用happy代替
+    RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral, &neutral));
+    RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan , &zhenyan ));
+    RegisterAnimation("shocked", CreateStaticEmotion("shocked", &zhenyan , &zhenyan ));
+    RegisterAnimation("thinking", CreateStaticEmotion("thinking", &neutral, &neutral));
+    RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral, &neutral));
+    RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan , &biyan ));
+    RegisterAnimation("delicious", CreateStaticEmotion("delicious", &happy, &happy));
+    RegisterAnimation("kissy", CreateStaticEmotion("kissy", &happy, &happy));
+    RegisterAnimation("confident", CreateStaticEmotion("confident", &zhenyan , &zhenyan ));
+    RegisterAnimation("silly", CreateStaticEmotion("silly", &funny, &funny));
+    RegisterAnimation("confused", CreateStaticEmotion("confused", &neutral, &neutral));
     
     // 特殊动画：眨眼（左眼眨，右眼睁开）
     RegisterAnimation("winking", CreateWinkingAnimation());
@@ -114,9 +117,9 @@ Animation EmotionManager::CreateDynamicEmotion(const std::string& name,
 Animation EmotionManager::CreateWinkingAnimation() {
     Animation animation("winking", false);
     // 左眼眨，右眼睁开，持续500ms
-    animation.AddFrame(&biyan_img, &zhenyan_img, 500);
+    animation.AddFrame(&biyan, &zhenyan, 500);
     // 恢复双眼睁开
-    animation.AddFrame(&zhenyan_img, &zhenyan_img, 0);
+    animation.AddFrame(&zhenyan, &zhenyan, 0);
     return animation;
 }
 
@@ -124,7 +127,7 @@ Animation EmotionManager::CreateWinkingAnimation() {
 Animation EmotionManager::CreateBlinkingAnimation() {
     Animation animation("blinking", true);  // 循环播放
     // 睁眼状态，持续2秒
-    animation.AddFrame(&zhenyan_img, &zhenyan_img, 2000);
+    animation.AddFrame(&zhenyan, &zhenyan, 2000);
     // 眨眼动画序列
     animation.AddFrame(&zhayang1, &zhayang1, 100);
     animation.AddFrame(&zhayang2, &zhayang2, 100);

@@ -274,7 +274,7 @@ const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMAGE_BIYAN u
 // };
 
 
-const lv_img_dsc_t biyan_img = {
+const lv_img_dsc_t biyan = {
   .header.cf = LV_COLOR_FORMAT_RGB565,
   .header.w = 240,
   .header.h = 240,
