@@ -4,9 +4,16 @@
 const char* EmotionManager::TAG = "EmotionManager";
 
 EmotionManager::EmotionManager() 
-    : default_animation_("neutral", false) {
-    // 在构造函数中初始化默认动画
-    default_animation_.AddFrame(&zhenyan_img, &zhenyan_img, 0);  // 静态睁眼表情
+    : default_animation_("blinking", true) {  // 改为眨眼动画作为默认S
+    // 在构造函数中初始化默认眨眼动画
+    default_animation_.AddFrame(&zhenyan_img, &zhenyan_img, 2000);    // 睁眼 2秒
+    default_animation_.AddFrame(&zhayang1, &zhayang1, 100);   // 眨眼帧1 100ms
+    default_animation_.AddFrame(&zhayang2, &zhayang2, 100);   // 眨眼帧2 100ms
+    default_animation_.AddFrame(&zhayang3, &zhayang3, 100);   // 眨眼帧3 100ms
+    default_animation_.AddFrame(&zhayang4, &zhayang4, 100);   // 眨眼帧4 100ms
+    default_animation_.AddFrame(&zhayang3, &zhayang3, 100);   // 眨眼帧3 100ms
+    default_animation_.AddFrame(&zhayang2, &zhayang2, 100);   // 眨眼帧2 100ms
+    default_animation_.AddFrame(&zhayang1, &zhayang1, 100);   // 眨眼帧1 100ms
 }
 
 const Animation& EmotionManager::GetAnimation(const std::string& emotion_name) {
@@ -116,9 +123,15 @@ Animation EmotionManager::CreateWinkingAnimation() {
 // 创建眨眼循环动画的私有方法
 Animation EmotionManager::CreateBlinkingAnimation() {
     Animation animation("blinking", true);  // 循环播放
-    // 双眼睁开，持续3秒
-    animation.AddFrame(&zhenyan_img, &zhenyan_img, 3000);
-    // 双眼闭合，持续200ms
-    animation.AddFrame(&biyan_img, &biyan_img, 200);
+    // 睁眼状态，持续2秒
+    animation.AddFrame(&zhenyan_img, &zhenyan_img, 2000);
+    // 眨眼动画序列
+    animation.AddFrame(&zhayang1, &zhayang1, 100);
+    animation.AddFrame(&zhayang2, &zhayang2, 100);
+    animation.AddFrame(&zhayang3, &zhayang3, 100);
+    animation.AddFrame(&zhayang4, &zhayang4, 100);
+    animation.AddFrame(&zhayang3, &zhayang3, 100);
+    animation.AddFrame(&zhayang2, &zhayang2, 100);
+    animation.AddFrame(&zhayang1, &zhayang1, 100);
     return animation;
 }

@@ -15,15 +15,13 @@
 #include <esp_lcd_panel_vendor.h>
 #include "dual_display_manager.h"
 
-
 #include "display/eye_display.h"  // 新增：眼睛显示类
 #include <cJSON.h>
-// #include "yuwell_xiaoyu_esp32s3_double_lcd.h"
+#include "board.h"
+
 #include "ui/eye.h"  //  // 新的眼睛图案头文件
 
-// LVGL 图片声明
-// LV_IMG_DECLARE(biyan_img);
-// LV_IMG_DECLARE(zhenyan_img);
+
 
 #define TAG "yuwell-xiaoyu-esp32s3-double-lcd"
 
@@ -202,5 +200,6 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::~YuwellXiaoyuEsp32S3BoardDoubleLcd() {
         eye_display_ = nullptr;
     }
 }
-// --- DECLARE_BOARD 宏 ---
+
+// 新增：声明板卡创建函数
 DECLARE_BOARD(YuwellXiaoyuEsp32S3BoardDoubleLcd);

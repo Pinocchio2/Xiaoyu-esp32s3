@@ -14,4 +14,10 @@ extern const lv_img_dsc_t listen_l_img;
 extern const lv_img_dsc_t listen_r_img;
 extern const lv_img_dsc_t neutral_img;
 
+// 新增眨眼动画帧声明
+extern lv_image_dsc_t zhayang1;
+extern lv_image_dsc_t zhayang2;
+extern lv_image_dsc_t zhayang3;
+extern lv_image_dsc_t zhayang4;
+
 #endif  // UI_EYE_H_

@@ -53,6 +53,13 @@ public:
                   int width, int height, int offset_x, int offset_y,
                   bool mirror_x, bool mirror_y, bool swap_xy,
                   DisplayFonts fonts);
+    
+    // 实现基类的纯虚函数 - 内联实现
+    virtual bool PlayAnimation(const Animation& animation) override {
+        // RGB LCD显示器主要用于常规UI显示，不支持复杂动画
+        ESP_LOGW("RgbLcdDisplay", "RgbLcdDisplay does not support animation playback");
+        return false;
+    }
 };
 
 // MIPI LCD显示器
@@ -62,15 +69,29 @@ public:
                    int width, int height, int offset_x, int offset_y,
                    bool mirror_x, bool mirror_y, bool swap_xy,
                    DisplayFonts fonts);
+    
+    // 实现基类的纯虚函数 - 内联实现
+    virtual bool PlayAnimation(const Animation& animation) override {
+        // MIPI LCD显示器主要用于常规UI显示，不支持复杂动画
+        ESP_LOGW("MipiLcdDisplay", "MipiLcdDisplay does not support animation playback");
+        return false;
+    }
 };
 
-// // SPI LCD显示器
+// SPI LCD显示器
 class SpiLcdDisplay : public LcdDisplay {
 public:
     SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                   int width, int height, int offset_x, int offset_y,
                   bool mirror_x, bool mirror_y, bool swap_xy,
                   DisplayFonts fonts);
+    
+    // 实现基类的纯虚函数 - 内联实现
+    virtual bool PlayAnimation(const Animation& animation) override {
+        // SPI LCD显示器主要用于常规UI显示，不支持复杂动画
+        ESP_LOGW("SpiLcdDisplay", "SpiLcdDisplay does not support animation playback");
+        return false;
+    }
 };
 
 // QSPI LCD显示器
@@ -80,6 +101,13 @@ public:
                    int width, int height, int offset_x, int offset_y,
                    bool mirror_x, bool mirror_y, bool swap_xy,
                    DisplayFonts fonts);
+    
+    // 实现基类的纯虚函数 - 内联实现
+    virtual bool PlayAnimation(const Animation& animation) override {
+        // QSPI LCD显示器主要用于常规UI显示，不支持复杂动画
+        ESP_LOGW("QspiLcdDisplay", "QspiLcdDisplay does not support animation playback");
+        return false;
+    }
 };
 
 // MCU8080 LCD显示器
@@ -89,5 +117,12 @@ public:
                       int width, int height, int offset_x, int offset_y,
                       bool mirror_x, bool mirror_y, bool swap_xy,
                       DisplayFonts fonts);
+    
+    // 实现基类的纯虚函数 - 内联实现
+    virtual bool PlayAnimation(const Animation& animation) override {
+        // MCU8080 LCD显示器主要用于常规UI显示，不支持复杂动画
+        ESP_LOGW("Mcu8080LcdDisplay", "Mcu8080LcdDisplay does not support animation playback");
+        return false;
+    }
 };
 #endif // LCD_DISPLAY_H

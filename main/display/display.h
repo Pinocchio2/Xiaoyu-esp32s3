@@ -8,6 +8,8 @@
 
 #include <string>
 
+struct Animation;
+
 struct DisplayFonts {
     const lv_font_t* text_font = nullptr;
     const lv_font_t* icon_font = nullptr;
@@ -30,7 +32,7 @@ public:
     virtual bool PlayAnimation(const Animation& animation) = 0;
 
 // 修改现有的 SetEmotion 方法，使其调用 EmotionManager
-    virtual void SetEmotion(const char* emotion) override;
+    //virtual void SetEmotion(const char* emotion) override;
 
 
     virtual std::string GetTheme() { return current_theme_name_; }
@@ -104,12 +106,18 @@ private:
     Display *display_;
 };
 
-class NoDisplay : public Display {
+class NoDisplay : public Display { // 定义一个名为NoDisplay的类，继承自Display类
 private:
-    virtual bool Lock(int timeout_ms = 0) override {
-        return true;
+    virtual bool Lock(int timeout_ms = 0) override { // 重写Lock函数，参数为timeout_ms，默认值为0
+        return true; // 返回true
     }
     virtual void Unlock() override {}
-};
+public:
+        // 新增：实现纯虚函数PlayAnimation
+    virtual bool PlayAnimation(const Animation& animation) override {
+            // NoDisplay不需要实际播放动画，直接返回true表示"成功"
+            return true;
+        } // 重写Unlock函数，无参数，无返回值
+    };
 
 #endif

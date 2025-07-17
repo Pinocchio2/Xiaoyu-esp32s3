@@ -29,12 +29,13 @@ public:
     virtual ~EyeDisplay();
     
     // 重写基类的虚函数
-    virtual void PlayAnimation(const Animation& animation) override;
+    virtual bool PlayAnimation(const Animation& animation) override;
     
     // 重写基类的其他必要方法
-    virtual bool Lock(uint32_t timeout_ms) override;
+    virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
-    virtual lv_disp_t* getLvDisplay() override;
+    //virtual lv_disp_t* getLvDisplay() override;
+    lv_disp_t* getLvDisplay();
 };
 
 #endif // EYE_DISPLAY_H

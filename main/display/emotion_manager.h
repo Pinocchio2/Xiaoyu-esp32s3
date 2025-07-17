@@ -73,6 +73,12 @@ private:
                                  const std::vector<AnimationFrame>& frames, 
                                  bool loop = false);
     
+    // 创建眨眼动画的辅助方法
+    Animation CreateWinkingAnimation();
+    
+    // 创建眨眼循环动画的辅助方法
+    Animation CreateBlinkingAnimation();
+    
     std::map<std::string, Animation> animations_;  // 存储所有表情动画的映射表
     Animation default_animation_;                   // 默认的中性表情动画
     
