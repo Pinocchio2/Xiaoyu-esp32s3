@@ -18,7 +18,7 @@ public:
     
     void Initialize();
     void InitializeUI(); // 新增UI初始化方法
-    void SetImage(bool is_primary, const void* src);
+    void SetImage(bool is_primary, const lv_img_dsc_t* src);
     
     // 获取显示屏
     Display* GetPrimaryDisplay() { return primary_display_; }

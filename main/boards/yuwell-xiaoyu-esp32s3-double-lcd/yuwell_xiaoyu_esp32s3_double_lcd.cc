@@ -15,13 +15,12 @@
 #include <esp_lcd_panel_vendor.h>
 #include "dual_display_manager.h"
 
-#include "display/eye_display.h"  // 新增：眼睛显示类
+// 修改：使用EyeAnimationDisplay替换EyeDisplay
+#include "display/eye_animation_display.h"  // 包含EyeAnimationDisplay类定义
 #include <cJSON.h>
 #include "board.h"
 
-#include "ui/eye.h"  //  // 新的眼睛图案头文件
-
-
+#include "ui/eye.h"  // 眼睛图案头文件
 
 #define TAG "yuwell-xiaoyu-esp32s3-double-lcd"
 
@@ -34,7 +33,8 @@ private:
     Button wifi_switch_button_;
     DualDisplayManager dual_display_manager_;
 
-    EyeDisplay* eye_display_; // 新增：眼睛显示对象
+    // 修改：使用EyeAnimationDisplay替换EyeDisplay
+    EyeAnimationDisplay* eye_display_; // 眼睛动画显示对象
 
     // 私有初始化函数的声明
     void InitUart();
@@ -46,8 +46,6 @@ public:
     // 构造函数
     YuwellXiaoyuEsp32S3BoardDoubleLcd();
     ~YuwellXiaoyuEsp32S3BoardDoubleLcd();
-
-    
 
     // 重写的虚函数声明
     virtual Display* GetDisplay() override;
@@ -77,6 +75,10 @@ public:
 // --- 类的成员函数定义部分 ---
 
 // 构造函数实现
+// 在文件顶部添加全局变量声明
+DualDisplayManager* g_dual_display_manager = nullptr;
+
+// 在构造函数中设置全局引用
 YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() : 
     DualNetworkBoard(ML307_TX_PIN, ML307_RX_PIN, 4096),
     boot_button_(BOOT_BUTTON_GPIO),
@@ -88,11 +90,14 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     InitializeButtons();
     InitializeIot();
 
-   // 显示系统初始化 - 重构重点
+    // 显示系统初始化 - 重构重点
     dual_display_manager_.Initialize();
     
-    // 创建统一的 EyeDisplay 接口
-    eye_display_ = new EyeDisplay(&dual_display_manager_);
+    // 设置全局引用
+    g_dual_display_manager = &dual_display_manager_;
+    
+    // 创建EyeAnimationDisplay对象，去掉UI只保留双屏眼睛
+    eye_display_ = new EyeAnimationDisplay();
     
     // 初始化背光（新增）
     if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {

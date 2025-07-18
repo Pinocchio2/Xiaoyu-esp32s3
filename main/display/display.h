@@ -31,13 +31,7 @@ public:
     
     virtual bool PlayAnimation(const Animation& animation) = 0;
 
-// 修改现有的 SetEmotion 方法，使其调用 EmotionManager
-    //virtual void SetEmotion(const char* emotion) override;
-
-
     virtual std::string GetTheme() { return current_theme_name_; }
-
-    
 
     /**
      * @brief 新增：一个独立的接口，用于根据蓝牙状态更新屏幕图标。
@@ -45,8 +39,7 @@ public:
      */
     void UpdateBluetoothStatus(bool is_enabled);
 
-    lv_display_t* getLvDisplay() { return display_; }//
-    
+    lv_display_t* getLvDisplay() { return display_; }
 
     inline int width() const { return width_; }
     inline int height() const { return height_; }
@@ -86,10 +79,7 @@ protected:
     lv_obj_t* bluetooth_label_ = nullptr;     // 指向蓝牙图标的LVGL对象
     const char* bluetooth_icon_ = nullptr;  // 存储当前图标的字符
     bool bluetooth_enabled_ = false;          // 存储蓝牙的当前状态
-
-
 };
-
 
 class DisplayLockGuard {
 public:
@@ -113,11 +103,11 @@ private:
     }
     virtual void Unlock() override {}
 public:
-        // 新增：实现纯虚函数PlayAnimation
+    // 新增：实现纯虚函数PlayAnimation
     virtual bool PlayAnimation(const Animation& animation) override {
-            // NoDisplay不需要实际播放动画，直接返回true表示"成功"
-            return true;
-        } // 重写Unlock函数，无参数，无返回值
-    };
+        // NoDisplay不需要实际播放动画，直接返回true表示"成功"
+        return true;
+    }
+};
 
 #endif

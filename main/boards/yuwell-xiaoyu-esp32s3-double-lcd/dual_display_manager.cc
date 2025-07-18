@@ -126,71 +126,70 @@ void DualDisplayManager::Initialize() {
 }
 
 
+// 文件: main/boards/yuwell-xiaoyu-esp32s3-double-lcd/dual_display_manager.cc
+
 void DualDisplayManager::InitializeUI() {
-    if (!primary_display_ || !secondary_display_) {
-        ESP_LOGE(TAG, "Cannot initialize UI, displays are not ready.");
-        return;
-    }
-
-    // 初始化主屏幕UI
-    {
+    // --- 主屏幕 (Primary Display) 的UI设置 ---
+    { // 为主屏幕操作创建一个独立的作用域
         DisplayLockGuard lock(primary_display_);
-        lv_obj_t* prim_scr = lv_disp_get_scr_act(primary_display_->getLvDisplay());
-        //lv_obj_clean(prim_scr);
-        lv_obj_set_style_bg_color(prim_scr, lv_color_black(), 0);
+        lv_disp_t* primary_disp = primary_display_->getLvDisplay();
+        if (primary_disp) {
+            lv_obj_t* primary_screen = lv_disp_get_scr_act(primary_disp);
+            lv_obj_clean(primary_screen);
+            lv_obj_set_style_bg_color(primary_screen, lv_color_black(), 0);
+            primary_img_obj_ = lv_img_create(primary_screen);
+            lv_obj_align(primary_img_obj_, LV_ALIGN_CENTER, 0, 0);
+            ESP_LOGI(TAG, "Primary display UI initialized.");
+        } else {
+            ESP_LOGE(TAG, "Primary display handle is NULL during UI init.");
+        }
+    } // 主屏幕的锁在这里被释放
 
-        // 创建一个240x240的容器作为“视口”
-        lv_obj_t* container = lv_obj_create(prim_scr);
-        lv_obj_set_size(container, 240, 240);
-        lv_obj_set_pos(container, 0, 0);
-        lv_obj_set_style_radius(container, 0, 0);
-        lv_obj_set_style_border_width(container, 0, 0);
-        lv_obj_set_style_pad_all(container, 0, 0);
-        // 在 LVGL v9 中, lv_obj_create 默认就会裁剪溢出的子对象，
-        // 因此不需要额外添加裁剪标志，代码更简洁。
-
-        // 在容器内创建图像对象
-        primary_img_obj_ = lv_img_create(container);
-    }
-
-    // 初始化副屏幕UI (采用相同的逻辑)
-    {
+    // --- 副屏幕 (Secondary Display) 的UI设置 ---
+    { // 为副屏幕操作创建另一个独立的作用域
         DisplayLockGuard lock(secondary_display_);
-        lv_obj_t* sec_scr = lv_disp_get_scr_act(secondary_display_->getLvDisplay());
-        //lv_obj_clean(sec_scr);
-        lv_obj_set_style_bg_color(sec_scr, lv_color_black(), 0);
-
-        // 为副屏幕创建容器
-        lv_obj_t* container = lv_obj_create(sec_scr);
-        lv_obj_set_size(container, 240, 240);
-        lv_obj_set_pos(container, 0, 0);
-        lv_obj_set_style_radius(container, 0, 0);
-        lv_obj_set_style_border_width(container, 0, 0);
-        lv_obj_set_style_pad_all(container, 0, 0);
-
-        // 在容器内创建图像对象
-        secondary_img_obj_ = lv_img_create(container);
-    }
-    ESP_LOGI(TAG, "Dual screen UI initialized with clipping containers for eye animation.");
+        lv_disp_t* secondary_disp = secondary_display_->getLvDisplay();
+        if (secondary_disp) {
+            lv_obj_t* secondary_screen = lv_disp_get_scr_act(secondary_disp);
+            lv_obj_clean(secondary_screen);
+            lv_obj_set_style_bg_color(secondary_screen, lv_color_black(), 0);
+            secondary_img_obj_ = lv_img_create(secondary_screen);
+            lv_obj_align(secondary_img_obj_, LV_ALIGN_CENTER, 0, 0);
+            ESP_LOGI(TAG, "Secondary display UI initialized.");
+        } else {
+            ESP_LOGE(TAG, "Secondary display handle is NULL during UI init.");
+        }
+    } // 副屏幕的锁在这里被释放
 }
 
 
-void DualDisplayManager::SetImage(bool is_primary, const void* src) {
+// 文件: main/boards/yuwell-xiaoyu-esp32s3-double-lcd/dual_display_manager.cc
+
+void DualDisplayManager::SetImage(bool is_primary, const lv_img_dsc_t* src) {
+    const char* disp_name = is_primary ? "Primary" : "Secondary";
+    
+    // 因为这是成员函数，所以可以直接访问成员变量
     Display* target_display = is_primary ? primary_display_ : secondary_display_;
     lv_obj_t* target_img_obj = is_primary ? primary_img_obj_ : secondary_img_obj_;
-    
-    //ESP_LOGI(TAG, "Setting image for %s display", is_primary ? "primary" : "secondary");
-    
-    if (target_display && target_img_obj) {
-        DisplayLockGuard lock(target_display);
-        
-        
-        lv_img_set_src(target_img_obj, src);
-        
-        lv_obj_set_pos(target_img_obj, 0, 0);
 
-        lv_obj_invalidate(lv_obj_get_parent(target_img_obj));
-    } else {
-        ESP_LOGE(TAG, "Failed to set image: display or image object is null");
+    if (!target_display) {
+        ESP_LOGE(TAG, "SetImage: %s display handle is NULL!", disp_name);
+        return;
     }
+    if (!target_img_obj) {
+        ESP_LOGE(TAG, "SetImage: %s image object is NULL!", disp_name);
+        return;
+    }
+    if (!src) {
+        ESP_LOGE(TAG, "SetImage: Image source for %s is NULL!", disp_name);
+        return;
+    }
+    
+    // 使用正确的参数名 src
+    ESP_LOGD(TAG, "SetImage: Updating %s. Image object: %p, Image source addr: %p (w:%d, h:%d)", 
+             disp_name, target_img_obj, src, src->header.w, src->header.h);
+
+    DisplayLockGuard lock(target_display);
+    // 使用正确的参数名 src
+    lv_img_set_src(target_img_obj, src);
 }
