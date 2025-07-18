@@ -5,9 +5,9 @@
 #include <driver/spi_common.h>
 #include <vector>
 #include <esp_lvgl_port.h>
-#include "config.h" // 确保包含了包含引脚定义的头文件
+#include "config.h" 
 
-// 添加字体声明 (尽管眼睛动画用不上，但保留着不会错)
+
 LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(font_awesome_16_4);
 
@@ -187,27 +187,8 @@ void DualDisplayManager::SetImage(bool is_primary, const void* src) {
         
         lv_img_set_src(target_img_obj, src);
         
-       
-        //    源图像尺寸为 480x480 像素。
-        
-        // 设置位置为(0, 0) 将显示左上角的眼睛
         lv_obj_set_pos(target_img_obj, 0, 0);
 
-        /*
-         * --- 如何显示其他眼睛 ---
-         * 图像的坐标系原点(0,0)是左上角。
-         *
-         * 显示右上角的眼睛 (向左移动240像素): 
-         * lv_obj_set_pos(target_img_obj, -240, 0);
-         *
-         * 显示左下角的眼睛 (向上移动240像素): 
-         * lv_obj_set_pos(target_img_obj, 0, -240);
-         *
-         * 显示右下角的眼睛 (向左上移动240像素): 
-         * lv_obj_set_pos(target_img_obj, -240, -240);
-        */
-        
-        // 强制刷新显示
         lv_obj_invalidate(lv_obj_get_parent(target_img_obj));
     } else {
         ESP_LOGE(TAG, "Failed to set image: display or image object is null");

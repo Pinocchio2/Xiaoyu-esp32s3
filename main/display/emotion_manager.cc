@@ -78,8 +78,8 @@ void EmotionManager::InitializeAnimations() {
     RegisterAnimation("loving", CreateStaticEmotion("loving", &happy, &happy));  // 暂时用happy代替
     RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral, &neutral));
     RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan , &zhenyan ));
-    RegisterAnimation("shocked", CreateStaticEmotion("shocked", &zhenyan , &zhenyan ));
-    RegisterAnimation("thinking", CreateStaticEmotion("thinking", &neutral, &neutral));
+    RegisterAnimation("shockeinkid", CreateStaticEmotion("shocked", &zhenyan , &zhenyan ));
+    RegisterAnimation("thng", CreateStaticEmotion("thinking", &neutral, &neutral));
     RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral, &neutral));
     RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan , &biyan ));
     RegisterAnimation("delicious", CreateStaticEmotion("delicious", &happy, &happy));

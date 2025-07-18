@@ -59,6 +59,19 @@ public:
     
     // 获取显示管理器（如果需要直接访问）
     DualDisplayManager* GetDualDisplayManager();
+    
+    // 添加背光控制方法
+    virtual Backlight* GetBacklight() override {
+        // 如果背光引脚不为NC
+        if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
+            // 静态创建一个PwmBacklight对象
+            static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+            // 返回背光对象
+            return &backlight;
+        }
+        // 否则返回空指针
+        return nullptr;
+    }
 };
 
 // --- 类的成员函数定义部分 ---
@@ -80,6 +93,11 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     
     // 创建统一的 EyeDisplay 接口
     eye_display_ = new EyeDisplay(&dual_display_manager_);
+    
+    // 初始化背光（新增）
+    if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
+        GetBacklight()->SetBrightness(100);  // 设置为100%亮度，但由于INVERT=true，实际输出低电平
+    }
     
     ESP_LOGI(TAG, "Board initialization complete.");
     
