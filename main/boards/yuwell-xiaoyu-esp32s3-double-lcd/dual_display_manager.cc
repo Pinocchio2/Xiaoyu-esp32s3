@@ -133,38 +133,36 @@ void DualDisplayManager::Initialize() {
 
 // 文件: main/boards/yuwell-xiaoyu-esp32s3-double-lcd/dual_display_manager.cc
 
+// 这是您文件中旧的、有问题的函数
+// [最终代码] 在 dual_display_manager.cc 中
 void DualDisplayManager::InitializeUI() {
     // --- 主屏幕 (Primary Display) 的UI设置 ---
-    { // 为主屏幕操作创建一个独立的作用域
+    {
         DisplayLockGuard lock(primary_display_);
-        lv_disp_t* primary_disp = primary_display_->getLvDisplay();
-        if (primary_disp) {
-            lv_obj_t* primary_screen = lv_disp_get_scr_act(primary_disp);
-            lv_obj_clean(primary_screen);
-            lv_obj_set_style_bg_color(primary_screen, lv_color_black(), 0);
-            primary_img_obj_ = lv_img_create(primary_screen);
+        lv_disp_t* disp = primary_display_->getLvDisplay();
+        if (disp) {
+            lv_obj_t* screen = lv_disp_get_scr_act(disp);
+            lv_obj_clean(screen);
+            lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
+            primary_img_obj_ = lv_img_create(screen);
             lv_obj_align(primary_img_obj_, LV_ALIGN_CENTER, 0, 0);
-            ESP_LOGI(TAG, "Primary display UI initialized.");
-        } else {
-            ESP_LOGE(TAG, "Primary display handle is NULL during UI init.");
+            ESP_LOGI(TAG, "Primary display UI initialized for animation only.");
         }
-    } // 主屏幕的锁在这里被释放
+    }
 
     // --- 副屏幕 (Secondary Display) 的UI设置 ---
-    { // 为副屏幕操作创建另一个独立的作用域
+    {
         DisplayLockGuard lock(secondary_display_);
-        lv_disp_t* secondary_disp = secondary_display_->getLvDisplay();
-        if (secondary_disp) {
-            lv_obj_t* secondary_screen = lv_disp_get_scr_act(secondary_disp);
-            lv_obj_clean(secondary_screen);
-            lv_obj_set_style_bg_color(secondary_screen, lv_color_black(), 0);
-            secondary_img_obj_ = lv_img_create(secondary_screen);
+        lv_disp_t* disp = secondary_display_->getLvDisplay();
+        if (disp) {
+            lv_obj_t* screen = lv_disp_get_scr_act(disp);
+            lv_obj_clean(screen);
+            lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
+            secondary_img_obj_ = lv_img_create(screen);
             lv_obj_align(secondary_img_obj_, LV_ALIGN_CENTER, 0, 0);
-            ESP_LOGI(TAG, "Secondary display UI initialized.");
-        } else {
-            ESP_LOGE(TAG, "Secondary display handle is NULL during UI init.");
+            ESP_LOGI(TAG, "Secondary display UI initialized for animation only.");
         }
-    } // 副屏幕的锁在这里被释放
+    }
 }
 
 

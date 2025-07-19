@@ -3,12 +3,44 @@
 #include <algorithm>
 #include "freertos/FreeRTOS.h"
 #include "lvgl.h"  // 确保包含主LVGL头文件
-// 添加这行来包含动画图像组件
-//#include "lvgl/src/widgets/animimage/lv_animimage.h"
+#include "ui/eye.h"  // 包含现有的图像资源声明
+
+// --- 关键修复 1: 引入外部的显示管理器 ---
+// 我们需要它来正确地在两个屏幕上绘图
+// --- 修改为更明确的路径 ---
+#include "boards/yuwell-xiaoyu-esp32s3-double-lcd/dual_display_manager.h"
+
+// 并且，为了能使用全局变量 g_dual_display_manager，还需要添加下面这行
+extern DualDisplayManager* g_dual_display_manager;
+// --- 在这里添加下面这个完整的新代码块 ---
+
 
 #define TAG "DualAnimation"
 
+// // --- 关键修复 2: 为所有单帧动画创建持久的图像数组 ---
+// // 这可以防止因使用临时数组而导致的悬空指针问题
+// const lv_img_dsc_t* blink_anim_images[] = {&eye_blink_00, &eye_blink_01, &eye_blink_02, &eye_blink_03, &eye_blink_04, &eye_blink_05, &eye_blink_04, &eye_blink_03, &eye_blink_02, &eye_blink_01, &eye_blink_00, nullptr};
+// const lv_img_dsc_t* closed_eyes_images[] = {&eye_closed_00, nullptr};
+// const lv_img_dsc_t* happy_images[] = {&eye_happy_00, nullptr};
+// const lv_img_dsc_t* sad_images[] = {&eye_sad_00, nullptr};
+// const lv_img_dsc_t* think_images[] = {&eye_think_00, nullptr};
+// const lv_img_dsc_t* angry_images[] = {&eye_angry_00, nullptr};
 
+
+// --- 关键修复 3: 定义并初始化 "emotions_anim" 向量 ---
+// 这是导致程序崩溃的直接原因，因为它之前只被声明，从未被定义
+// std::vector<emotions_anim_t> emotions_anim = {
+//     {{blink_anim_images, "yanzhu", nullptr, 1, 10}, "yanzhu"},
+//     {{blink_anim_images, "wakeup", nullptr, 1, 10}, "wakeup"},
+//     {{closed_eyes_images, "closed_eyes", nullptr, 1}, "closed_eyes"},
+//     {{closed_eyes_images, "sleep", nullptr, 1}, "sleep"},
+//     {{happy_images, "happy", nullptr, 1}, "happy"},
+//     {{sad_images, "sad", nullptr, 1}, "sad"},
+//     {{think_images, "think", nullptr, 1}, "think"},
+//     {{angry_images, "angry", nullptr, 1}, "angry"},
+//     {{nullptr, "shark", shark_animation, 1, 2000}, "shark"},
+//     {{nullptr, "smile", smile_animation, 1, 2000}, "smile"},
+// };
 
 DualAnimation::DualAnimation()
 {
@@ -31,6 +63,9 @@ void DualAnimation::animation_task(void *param) {
             ESP_LOGI(TAG, "Running animation: count=%d, duration=%d", anim.count, anim.duration);
             if (anim.callback) {
                 delay_time = anim.callback(anim.count, anim.duration);
+            }
+            if (delay_time == 0) {
+                delay_time = 1;  // 最小延时1ms
             }
             xFrequency = pdMS_TO_TICKS(delay_time);
             ESP_LOGI(TAG, "Animation completed, delay: %ld ms", delay_time);
@@ -86,54 +121,56 @@ void set_eye_size(void  * obj, int32_t num)
 }
 
 
-LV_IMAGE_DECLARE(screen_animimg_1laugh_0);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_1);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_2);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_3);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_4);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_5);
-LV_IMAGE_DECLARE(screen_animimg_1laugh_6);
 
-const lv_image_dsc_t * screen_animimg_1_imgs[7] = {
-    &screen_animimg_1laugh_0,
-    &screen_animimg_1laugh_1,
-    &screen_animimg_1laugh_2,
-    &screen_animimg_1laugh_3,
-    &screen_animimg_1laugh_4,
-    &screen_animimg_1laugh_5,
-    &screen_animimg_1laugh_6,
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_0);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_1);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_2);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_3);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_4);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_5);
+// LV_IMAGE_DECLARE(screen_animimg_1laugh_6);
+//
+// const lv_image_dsc_t * screen_animimg_1_imgs[7] = {
+//     &screen_animimg_1laugh_0,
+//     &screen_animimg_1laugh_1,
+//     &screen_animimg_1laugh_2,
+//     &screen_animimg_1laugh_3,
+//     &screen_animimg_1laugh_4,
+//     &screen_animimg_1laugh_5,
+//     &screen_animimg_1laugh_6,
+// };
+
+//使用现有的图像资源）：
+const lv_image_dsc_t * screen_animimg_1_imgs[4] = {
+    &zhayang1,  // 使用现有的眨眼动画帧
+    &zhayang2,
+    &zhayang3,
+    &zhayang4,
 };
 
 uint32_t smile_animation(int count, uint16_t duration) {
-    // 实现微笑动画的逻辑
+    // 实现微笑动画的逻辑，使用现有的图像资源
     ESP_LOGI(TAG, "Smile animation executed with count=%d and duration=%d", count, duration);
 
-    lv_obj_t*  a1 = lv_animimg_create(lv_scr_act());
+    // 为第一个屏幕创建动画图像对象
+    lv_obj_t* a1 = lv_animimg_create(lv_scr_act());
     lv_obj_set_pos(a1, 0, 0);
     lv_obj_set_size(a1, 240, 240);
-    lv_animimg_set_src(a1, (const void **) screen_animimg_1_imgs, 7);
-    lv_animimg_set_duration(a1, 80*7);
-    lv_animimg_set_repeat_count(a1, 0);
-    //lv_animimg_start(a);
+    lv_animimg_set_src(a1, (const void **) screen_animimg_1_imgs, 4);  // 使用4帧动画
+    lv_animimg_set_duration(a1, 80*4);  // 调整持续时间
+    lv_animimg_set_repeat_count(a1, count > 0 ? count : LV_ANIM_REPEAT_INFINITE);
+    lv_animimg_start(a1);  // 启动动画
 
-
-    lv_obj_t*  a2 = lv_animimg_create(lv_scr_act());
-    lv_obj_set_pos(a2, 0, 0);
+    // 为第二个屏幕创建动画图像对象
+    lv_obj_t* a2 = lv_animimg_create(lv_scr_act());
+    lv_obj_set_pos(a2, 240, 0);  // 设置第二个屏幕的位置
     lv_obj_set_size(a2, 240, 240);
-    lv_animimg_set_src(a2, (const void **) screen_animimg_1_imgs, 7);
-    lv_animimg_set_duration(a1, 80*7);
-    lv_animimg_set_repeat_count(a2, 0);
+    lv_animimg_set_src(a2, (const void **) screen_animimg_1_imgs, 4);
+    lv_animimg_set_duration(a2, 80*4);
+    lv_animimg_set_repeat_count(a2, count > 0 ? count : LV_ANIM_REPEAT_INFINITE);
+    lv_animimg_start(a2);  // 启动动画
 
-
-    lv_anim_timeline_t* anim_timeline = lv_anim_timeline_create();
-    lv_anim_timeline_add(anim_timeline, 0, (lv_anim_t*)a1);
-    lv_anim_timeline_add(anim_timeline, 0, (lv_anim_t*)a2);
-
-    lv_anim_timeline_start(anim_timeline);
-
-
-
-    return 560; // 返回动画执行的延迟时间
+    return duration;
 }
 
 

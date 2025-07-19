@@ -92,6 +92,17 @@ public:
         ESP_LOGW("SpiLcdDisplay", "SpiLcdDisplay does not support animation playback");
         return false;
     }
+
+    // --- 关键修改：添加以下空的函数实现 ---
+    // 这是为了满足基类Display的接口要求，因为我们不再创建UI，所以这些函数什么都不做
+    virtual void SetStatus(const char* status) override {}
+    virtual void ShowNotification(const char* notification, int duration_ms = 3000) override {}
+    virtual void ShowNotification(const std::string &notification, int duration_ms = 3000) override {}
+    virtual void SetEmotion(const char* emotion) override {}
+    virtual void SetChatMessage(const char* role, const char* content) override {}
+    virtual void SetIcon(const char* icon) override {}
+    virtual void SetTheme(const std::string& theme_name) override {}
+    virtual void UpdateBluetoothStatus(bool is_enabled) override {}
 };
 
 // QSPI LCD显示器

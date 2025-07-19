@@ -200,7 +200,8 @@ AudioCodec* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetAudioCodec() {
 // 修改GetDisplay方法的实现
 Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
     // 返回nullptr或者创建一个适配器
-    return nullptr;  // 临时解决方案
+        return nullptr;  
+
 }
 
 // 添加一个新的方法来获取DualEyeDisplay

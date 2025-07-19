@@ -1057,29 +1057,29 @@ void Application::UartListenTask() {
     while (true) {
         int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
 
-        // 添加动画测试命令
-        if (length > 10 && strncmp((char*)buffer, "test_dual ", 10) == 0) {
-            char* anim_name = (char*)buffer + 10;
-            char* newline = strchr(anim_name, '\n');
-            if (newline) *newline = '\0';
+        // // 添加动画测试命令
+        // if (length > 10 && strncmp((char*)buffer, "test_dual ", 10) == 0) {
+        //     char* anim_name = (char*)buffer + 10;
+        //     char* newline = strchr(anim_name, '\n');
+        //     if (newline) *newline = '\0';
             
-            auto& board = Board::GetInstance();
-            auto display = board.GetDisplay();
-            display->SetEmotion(anim_name);
+        //     auto& board = Board::GetInstance();
+        //     auto display = board.GetDisplay();
+        //     display->SetEmotion(anim_name);
             
-            printf("播放双屏动画: %s\n", anim_name);
-            continue;
-        }
+        //     printf("播放双屏动画: %s\n", anim_name);
+        //     continue;
+        // }
         
-        // 添加动画列表命令
-        if (length >= 11 && strncmp((char*)buffer, "list_anims\n", 11) == 0) {
-            printf("可用动画:\n");
-            printf("- happy (眨眼动画)\n");
-            printf("- laughing (微笑动画)\n");
-            printf("- neutral (空动画)\n");
-            printf("使用方法: test_dual <动画名>\n");
-            continue;
-        }
+        // // 添加动画列表命令
+        // if (length >= 11 && strncmp((char*)buffer, "list_anims\n", 11) == 0) {
+        //     printf("可用动画:\n");
+        //     printf("- happy (眨眼动画)\n");
+        //     printf("- laughing (微笑动画)\n");
+        //     printf("- neutral (空动画)\n");
+        //     printf("使用方法: test_dual <动画名>\n");
+        //     continue;
+        // }
 
         //int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
 
