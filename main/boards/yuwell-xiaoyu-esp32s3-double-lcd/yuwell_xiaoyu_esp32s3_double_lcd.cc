@@ -16,7 +16,7 @@
 #include "dual_display_manager.h"
 
 // 修改：使用EyeAnimationDisplay替换EyeDisplay
-#include "display/eye_animation_display.h"  // 包含EyeAnimationDisplay类定义
+#include "display/dual_eye_display.h"  // 包含EyeAnimationDisplay类定义
 #include <cJSON.h>
 #include "board.h"
 
@@ -34,7 +34,7 @@ private:
     DualDisplayManager dual_display_manager_;
 
     // 修改：使用EyeAnimationDisplay替换EyeDisplay
-    EyeAnimationDisplay* eye_display_; // 眼睛动画显示对象
+    DualEyeDisplay* eye_display_; // 眼睛动画显示对象
 
     // 私有初始化函数的声明
     void InitUart();
@@ -57,6 +57,9 @@ public:
     
     // 获取显示管理器（如果需要直接访问）
     DualDisplayManager* GetDualDisplayManager();
+    
+    // 添加GetDualEyeDisplay方法声明
+    DualEyeDisplay* GetDualEyeDisplay();
     
     // 添加背光控制方法
     virtual Backlight* GetBacklight() override {
@@ -97,7 +100,7 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     g_dual_display_manager = &dual_display_manager_;
     
     // 创建EyeAnimationDisplay对象，去掉UI只保留双屏眼睛
-    eye_display_ = new EyeAnimationDisplay();
+    eye_display_ = new DualEyeDisplay();
     
     // 初始化背光（新增）
     if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
@@ -194,8 +197,14 @@ AudioCodec* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetAudioCodec() {
     return &audio_codec;
 }
 
+// 修改GetDisplay方法的实现
 Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
-    
+    // 返回nullptr或者创建一个适配器
+    return nullptr;  // 临时解决方案
+}
+
+// 添加一个新的方法来获取DualEyeDisplay
+DualEyeDisplay* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDualEyeDisplay() {
     return eye_display_;
 }
 

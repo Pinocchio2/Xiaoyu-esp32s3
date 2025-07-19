@@ -76,6 +76,7 @@ public:
     bool CanEnterSleepMode();
     //新增控制眼睛状态
     void SetEyeState(bool awake);
+    void TestDualAnimations();  // 添加测试方法
 
 private:
     Application();

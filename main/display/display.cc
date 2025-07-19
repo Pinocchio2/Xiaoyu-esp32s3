@@ -12,7 +12,7 @@
 #include "settings.h"
 #include "assets/lang_config.h"
 // 在文件顶部添加包含
-#include "emotion_manager.h"
+//#include "emotion_manager.h"
 
 #define TAG "Display"
 
@@ -254,15 +254,12 @@ void Display::SetEmotion(const char* emotion) {
         emotion = "neutral";
     }
     
-    // 从 EmotionManager 获取动画
-    const Animation& animation = EmotionManager::GetInstance().GetAnimation(std::string(emotion));
+    // 由于我们现在使用 dual_animation 系统，这里只是一个基础实现
+    // 具体的动画播放由子类（如 DualEyeDisplay）实现
+    ESP_LOGI("Display", "设置表情: %s", emotion);
     
-    // 调用子类实现的 PlayAnimation 方法
-    if (!PlayAnimation(animation)) {
-        ESP_LOGE("Display", "播放表情动画失败: %s", emotion);
-        // 尝试播放默认动画
-        PlayAnimation(EmotionManager::GetInstance().GetDefaultAnimation());
-    }
+    // 子类应该重写这个方法来实现具体的动画播放
+    // 这里提供一个默认的空实现
 }
 
 

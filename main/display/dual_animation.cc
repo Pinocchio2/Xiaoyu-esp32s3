@@ -2,6 +2,9 @@
 #include <cstring>
 #include <algorithm>
 #include "freertos/FreeRTOS.h"
+#include "lvgl.h"  // 确保包含主LVGL头文件
+// 添加这行来包含动画图像组件
+//#include "lvgl/src/widgets/animimage/lv_animimage.h"
 
 #define TAG "DualAnimation"
 
@@ -189,4 +192,20 @@ uint32_t shark_animation(int count, uint16_t duration) {
 
     return 300; // 返回动画执行的延迟时间
 }
+
+// uint32_t smile_animation(int screen_id, uint16_t delay) {
+//     // 创建图像对象
+//     lv_obj_t* img = lv_img_create(lv_scr_act());
+    
+//     // 设置图像源
+//     // 需要先声明happy图片资源
+//     LV_IMG_DECLARE(happy);
+//     lv_img_set_src(img, &happy);
+    
+//     // 居中显示
+//     lv_obj_center(img);
+    
+//     // 返回显示时间
+//     return 2000; // 显示2秒
+// }
 

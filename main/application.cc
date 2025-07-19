@@ -15,7 +15,8 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
-#include "display/emotion_manager.h"
+//#include "display/emotion_manager.h"
+#include "display/dual_eye_display.h"
 
 // #include "boards/yuwell-xiaoyu-esp32s3-double-lcd/yuwell_xiaoyu_esp32s3_double_lcd.h"
 // extern const lv_img_dsc_t biyan_img;
@@ -398,7 +399,7 @@ void Application::Start() {
     auto display = board.GetDisplay();
     
     // 初始化表情动画 - 添加这一行
-    EmotionManager::GetInstance().PreloadAllAnimations();
+    //EmotionManager::GetInstance().PreloadAllAnimations();
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
@@ -1055,6 +1056,32 @@ void Application::UartListenTask() {
 
     while (true) {
         int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
+
+        // 添加动画测试命令
+        if (length > 10 && strncmp((char*)buffer, "test_dual ", 10) == 0) {
+            char* anim_name = (char*)buffer + 10;
+            char* newline = strchr(anim_name, '\n');
+            if (newline) *newline = '\0';
+            
+            auto& board = Board::GetInstance();
+            auto display = board.GetDisplay();
+            display->SetEmotion(anim_name);
+            
+            printf("播放双屏动画: %s\n", anim_name);
+            continue;
+        }
+        
+        // 添加动画列表命令
+        if (length >= 11 && strncmp((char*)buffer, "list_anims\n", 11) == 0) {
+            printf("可用动画:\n");
+            printf("- happy (眨眼动画)\n");
+            printf("- laughing (微笑动画)\n");
+            printf("- neutral (空动画)\n");
+            printf("使用方法: test_dual <动画名>\n");
+            continue;
+        }
+
+        //int length = uart_read_bytes(UART_NUM_2, buffer, buffer_size, pdMS_TO_TICKS(30));
 
         if (length > 0) {
             int processed_offset = 0;
