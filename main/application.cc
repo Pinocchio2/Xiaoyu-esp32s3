@@ -887,7 +887,7 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
-            display->SetEmotion("neutral");
+            display->SetEmotion("yanzhu");
             // 空闲状态设置闭眼
             //SetEyeState(false);
 
@@ -900,10 +900,10 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
-            display->SetEmotion("neutral");
+            display->SetEmotion("yanzhu");
             display->SetChatMessage("system", "");
             // 连接状态设置闭眼
-            SetEyeState(false);
+            //SetEyeState(false);
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);

@@ -204,8 +204,8 @@ Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
 void YuwellXiaoyuEsp32S3BoardDoubleLcd::SetEyeState(bool awake) {
     if (eye_display_) {
         if (awake) {
-            // 使用表情管理器设置睁眼表情
-            eye_display_->SetEmotion("open_eyes");
+            // 使用yanzhu动画表示设备醒着状态
+            eye_display_->SetEmotion("yanzhu");
         } else {
             // 使用表情管理器设置闭眼表情
             eye_display_->SetEmotion("closed_eyes");
