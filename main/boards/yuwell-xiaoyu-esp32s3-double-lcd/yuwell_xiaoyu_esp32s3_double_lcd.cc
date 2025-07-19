@@ -195,7 +195,7 @@ AudioCodec* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetAudioCodec() {
 }
 
 Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
-    // 返回 EyeDisplay 对象，提供统一的显示接口
+    
     return eye_display_;
 }
 

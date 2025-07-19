@@ -136,6 +136,18 @@ private:
     // 双屏引用
     Display* primary_display_ = nullptr;    // 主屏幕引用
     Display* secondary_display_ = nullptr;  // 副屏幕引用
+    
+    // 添加静态缓存结构，避免频繁分配内存
+    struct ImageUpdateData {
+        lv_obj_t* img_obj;
+        const void* img_src;
+    };
+    
+    static ImageUpdateData left_eye_data_;   // 静态缓存
+    static ImageUpdateData right_eye_data_;  // 静态缓存
+    
+    // 静态回调函数，避免lambda开销
+    static void update_image_callback(void* user_data);
 };
 
 #endif // EYE_ANIMATION_DISPLAY_H

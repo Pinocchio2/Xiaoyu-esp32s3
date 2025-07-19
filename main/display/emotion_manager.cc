@@ -98,6 +98,9 @@ void EmotionManager::InitializeAnimations() {
     
     // 新增yanzhu动画
     RegisterAnimation("yanzhu", CreateYanzhuAnimation());
+
+    //眼珠缩放动画
+    RegisterAnimation("eyeball", CreateYanzhuScaleAnimation());
 }
 
 Animation EmotionManager::CreateStaticEmotion(const std::string& name, 
@@ -152,14 +155,27 @@ Animation EmotionManager::CreateYanzhuAnimation() {
     Animation animation("yanzhu", true);  // 循环播放
     
     // 添加8帧yanzhu动画，每帧持续200ms
-    animation.AddFrame(&yanzhu1, &yanzhu1, 200);
-    animation.AddFrame(&yanzhu2, &yanzhu2, 200);
-    animation.AddFrame(&yanzhu3, &yanzhu3, 200);
-    animation.AddFrame(&yanzhu4, &yanzhu4, 200);
-    animation.AddFrame(&yanzhu5, &yanzhu5, 200);
-    animation.AddFrame(&yanzhu6, &yanzhu6, 200);
-    animation.AddFrame(&yanzhu7, &yanzhu7, 200);
-    animation.AddFrame(&yanzhu8, &yanzhu8, 200);
+    animation.AddFrame(&yanzhu1, &yanzhu1, 500);
+    animation.AddFrame(&yanzhu2, &yanzhu2, 500);
+    animation.AddFrame(&yanzhu3, &yanzhu3, 500);
+    animation.AddFrame(&yanzhu2, &yanzhu2, 500);
+    
+    // animation.AddFrame(&yanzhu6, &yanzhu6, 100);
+    // animation.AddFrame(&yanzhu7, &yanzhu7, 100);
+    // animation.AddFrame(&yanzhu8, &yanzhu8, 100);
     
     return animation;
 }
+
+//眼珠缩放动画
+Animation EmotionManager::CreateYanzhuScaleAnimation() {
+    Animation animation("eyeball", true);  // 循环播放
+    
+    // 添加缩放动画帧
+    animation.AddFrame(&yanzhu_da, &yanzhu_da, 300);
+    animation.AddFrame(&yanzhu_xiao, &yanzhu_xiao, 600);
+    animation.AddFrame(&yanzhu_da, &yanzhu_da, 300);
+    
+    return animation;
+}
+

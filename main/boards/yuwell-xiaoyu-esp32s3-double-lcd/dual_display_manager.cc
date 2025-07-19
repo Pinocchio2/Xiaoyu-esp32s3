@@ -42,12 +42,17 @@ void DualDisplayManager::Initialize() {
     buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
     ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
     
-    // 2. 初始化LVGL核心环境 (只需一次)
+    // 2. 优化LVGL核心环境配置
     ESP_LOGI(TAG, "Initializing LVGL core environment...");
     lv_init();
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    port_cfg.task_priority = 4; // 您可以根据需要调整任务优先级
-    port_cfg.timer_period_ms = 5;
+    
+    // 优化配置：降低刷新频率，减少CPU负载
+    port_cfg.task_priority = 3;        // 降低优先级，避免与系统任务冲突
+    port_cfg.timer_period_ms = 16;     // 约60FPS，平衡流畅度和性能
+    port_cfg.task_max_sleep_ms = 500;  // 增加最大休眠时间
+    port_cfg.task_stack = 6144;   // 增加栈大小，避免栈溢出
+    
     lvgl_port_init(&port_cfg);
 
     DisplayFonts fonts = {
@@ -65,7 +70,7 @@ void DualDisplayManager::Initialize() {
     io_config1.cs_gpio_num = DISPLAY_CS_PIN;
     io_config1.dc_gpio_num = DISPLAY_DC_PIN;
     io_config1.spi_mode = DISPLAY_SPI_MODE;
-    io_config1.pclk_hz = 40 * 1000 * 1000;
+    io_config1.pclk_hz = 80 * 1000 * 1000;
     io_config1.trans_queue_depth = 10;
     io_config1.lcd_cmd_bits = 8;
     io_config1.lcd_param_bits = 8;
@@ -98,7 +103,7 @@ void DualDisplayManager::Initialize() {
     io_config2.cs_gpio_num = DISPLAY2_CS_PIN;
     io_config2.dc_gpio_num = DISPLAY_DC_PIN;
     io_config2.spi_mode = DISPLAY_SPI_MODE;
-    io_config2.pclk_hz = 40 * 1000 * 1000;
+    io_config2.pclk_hz = 80 * 1000 * 1000;
     io_config2.trans_queue_depth = 10;
     io_config2.lcd_cmd_bits = 8;
     io_config2.lcd_param_bits = 8;

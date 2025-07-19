@@ -30,4 +30,8 @@ extern const lv_img_dsc_t yanzhu6;
 extern const lv_img_dsc_t yanzhu7;
 extern const lv_img_dsc_t yanzhu8;
 
+// 新增眼珠放大动画帧声明
+extern const lv_img_dsc_t yanzhu_da;   // 眼珠放大
+extern const lv_img_dsc_t yanzhu_xiao; // 眼珠缩小
+
 #endif  // UI_EYE_H_

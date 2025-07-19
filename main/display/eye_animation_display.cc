@@ -88,7 +88,7 @@ EyeAnimationDisplay::EyeAnimationDisplay() {
         "eye_anim_task",
         4096,  // 栈大小
         this,  // 参数
-        5,     // 优先级
+        3,     // 优先级
         &animation_task_handle_
     );
 }
@@ -192,33 +192,40 @@ bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
     return true;
 }
 
+
+// 静态成员定义
+EyeAnimationDisplay::ImageUpdateData EyeAnimationDisplay::left_eye_data_;
+EyeAnimationDisplay::ImageUpdateData EyeAnimationDisplay::right_eye_data_;
+
+// 优化的静态回调函数
+void EyeAnimationDisplay::update_image_callback(void* user_data) {
+    ImageUpdateData* data = static_cast<ImageUpdateData*>(user_data);
+    if (data && data->img_obj && data->img_src) {
+        lv_img_set_src(data->img_obj, data->img_src);
+    }
+}
+
 void EyeAnimationDisplay::PlayNextFrame() {
     if (!current_animation_ || current_frame_index_ >= static_cast<int>(current_animation_->frames.size())) {
         ESP_LOGW(TAG, "无效的动画状态");
         return;
     }
-    
+
     const auto& frame = current_animation_->frames[current_frame_index_];
-    
-    // 使用LVGL的线程安全API，避免手动锁定
-    // 将图像更新操作放入LVGL的任务队列中执行
+
+    // 优化：使用静态缓存，避免频繁内存分配
     if (left_eye_img_ && frame.left_eye_image) {
-        // 使用lv_async_call确保在LVGL上下文中执行
-        lv_async_call([](void* user_data) {
-            auto* data = static_cast<std::pair<lv_obj_t*, const void*>*>(user_data);
-            lv_img_set_src(data->first, data->second);
-            delete data;
-        }, new std::pair<lv_obj_t*, const void*>(left_eye_img_, frame.left_eye_image));
+        left_eye_data_.img_obj = left_eye_img_;
+        left_eye_data_.img_src = frame.left_eye_image;
+        lv_async_call(update_image_callback, &left_eye_data_);
     }
-    
+
     if (right_eye_img_ && frame.right_eye_image) {
-        lv_async_call([](void* user_data) {
-            auto* data = static_cast<std::pair<lv_obj_t*, const void*>*>(user_data);
-            lv_img_set_src(data->first, data->second);
-            delete data;
-        }, new std::pair<lv_obj_t*, const void*>(right_eye_img_, frame.right_eye_image));
+        right_eye_data_.img_obj = right_eye_img_;
+        right_eye_data_.img_src = frame.right_eye_image;
+        lv_async_call(update_image_callback, &right_eye_data_);
     }
-    
+
     ESP_LOGD(TAG, "提交第 %d 帧更新请求，持续时间: %u ms", 
              current_frame_index_, (unsigned int)frame.duration_ms);
     

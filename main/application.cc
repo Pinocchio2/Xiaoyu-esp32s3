@@ -907,7 +907,7 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("listen");
+            display->SetEmotion("eyeball");
             // 倾听状态设置睁眼
             //SetEyeState(true);
 
