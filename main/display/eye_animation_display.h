@@ -2,6 +2,8 @@
 #define EYE_ANIMATION_DISPLAY_H
 
 #include "display.h"
+#include "freertos/FreeRTOS.h"  // 添加FreeRTOS头文件
+#include "freertos/task.h"      // 添加任务相关头文件
 
 /**
  * @brief 眼睛动画显示类 - 专门用于双屏眼睛动画
@@ -113,11 +115,18 @@ private:
      */
     static void animation_timer_callback(void* arg);
     
+    /**
+     * @brief 动画任务函数
+     * @param pvParameters 任务参数（this指针）
+     */
+    static void animation_task(void* pvParameters);
+    
     // 动画状态变量
     const Animation* current_animation_ = nullptr;  // 当前播放的动画
     int current_frame_index_ = 0;                  // 当前帧索引
     bool is_looping_ = false;                      // 是否循环播放
     esp_timer_handle_t animation_timer_ = nullptr; // 动画定时器句柄
+    TaskHandle_t animation_task_handle_ = nullptr; // 动画任务句柄
     
     // LVGL对象
     lv_obj_t* screen_ = nullptr;        // 屏幕对象
