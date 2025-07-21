@@ -887,7 +887,7 @@ void Application::SetDeviceState(DeviceState state) {
         case kDeviceStateUnknown:
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
-            display->SetEmotion("yanzhu");
+            display->SetEmotion("orbiting");
             // 空闲状态设置闭眼
             //SetEyeState(false);
 
@@ -900,7 +900,7 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
-            display->SetEmotion("yanzhu");
+            display->SetEmotion("orbiting");
             display->SetChatMessage("system", "");
             // 连接状态设置闭眼
             //SetEyeState(false);

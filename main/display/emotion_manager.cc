@@ -1,7 +1,76 @@
 #include "emotion_manager.h"
 #include <esp_log.h>
+#include <cmath> 
+
+// eye.h 应该已经包含了所有图片资源的声明
+#include "ui/eye.h"
 
 const char* EmotionManager::TAG = "EmotionManager";
+
+//================================================================
+// 1. 定义新的程序化动画创建函数
+//================================================================
+
+#ifndef LV_PI
+#define LV_PI 3.1415926535f
+#endif
+
+// LVGL动画的回调函数 - 计算眼珠在下眼睑的轨迹
+static void anim_path_cb(void * var, int32_t v) {
+    // 将角度值转换为弧度
+    float angle_rad = (float)v * LV_PI / 180.0f;
+    // 计算眼珠在圆形轨迹上的位置（半径45像素）
+    lv_coord_t new_x = 120 + (lv_coord_t)(45 * cosf(angle_rad));
+    lv_coord_t new_y = 120 + (lv_coord_t)(45 * sinf(angle_rad));
+    // 设置瞳孔位置（减去瞳孔半径30进行居中）
+    lv_obj_set_pos((lv_obj_t*)var, new_x - 30, new_y - 30);
+}
+
+// 实际创建动画的函数 (需要接收父对象)
+void create_orbiting_eye_anim_on_screen(lv_obj_t* scr) {
+    // 设置屏幕背景颜色为黑色
+    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+    lv_obj_clean(scr); // 清理屏幕
+
+    // 创建眼白
+    lv_obj_t * eyeball = lv_obj_create(scr);
+    lv_obj_set_size(eyeball, 180, 180);
+    lv_obj_align(eyeball, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_radius(eyeball, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(eyeball, lv_color_white(), 0);
+    lv_obj_set_style_border_width(eyeball, 0, 0);
+
+    // 创建瞳孔
+    lv_obj_t * pupil = lv_obj_create(scr);
+    lv_obj_set_size(pupil, 60, 60);
+    lv_obj_set_style_radius(pupil, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(pupil, lv_color_black(), 0);
+    lv_obj_set_style_border_width(pupil, 0, 0);
+
+    // 创建并配置动画
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, pupil);
+    lv_anim_set_values(&a, 180, 360);
+    lv_anim_set_time(&a, 2000);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a, anim_path_cb);
+    lv_anim_start(&a);
+}
+
+
+// 符合我们新接口的创建函数
+void create_dual_orbiting_eye_animation(lv_obj_t* parent_left, lv_obj_t* parent_right) {
+    if (parent_left) {
+        create_orbiting_eye_anim_on_screen(parent_left);
+    }
+    if (parent_right) {
+        create_orbiting_eye_anim_on_screen(parent_right);
+    }
+}
+
+
+
 
 EmotionManager::EmotionManager() 
     : default_animation_("blinking", true) {  // 改为眨眼动画作为默认S
@@ -43,8 +112,12 @@ void EmotionManager::RegisterAnimation(const std::string& emotion_name, const An
     
 
     animations_[emotion_name] = animation;
-    // 输出注册成功的日志
-    ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.frames.size());
+    // 修复：根据动画类型访问正确的成员
+    if (animation.type == Animation::Type::IMAGE_SEQUENCE && animation.image_sequence.frames) {
+        ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.image_sequence.frames->size());
+    } else {
+        ESP_LOGD(TAG, "注册表情动画: %s (程序化动画)", emotion_name.c_str());
+    }
 }
 
 // 检查emotion_name是否存在于animations_中
@@ -58,6 +131,9 @@ const Animation& EmotionManager::GetDefaultAnimation() const {
 }
 
 void EmotionManager::InitializeAnimations() {
+
+
+
     // 基础静态表情
     RegisterAnimation("neutral", CreateStaticEmotion("neutral", &zhenyan , &zhenyan ));
     RegisterAnimation("happy", CreateStaticEmotion("happy", &happy, &happy));
@@ -105,6 +181,9 @@ void EmotionManager::InitializeAnimations() {
 
     // 新增微笑动画
     RegisterAnimation("smile", CreateSmileAnimation());
+    
+    // 添加程序化orbiting动画注册
+    RegisterAnimation("orbiting", Animation("orbiting", create_dual_orbiting_eye_animation));
 }
 
 Animation EmotionManager::CreateStaticEmotion(const std::string& name, 
@@ -120,7 +199,8 @@ Animation EmotionManager::CreateDynamicEmotion(const std::string& name,
                                              bool loop) {
     Animation animation(name, loop);
     for (const auto& frame : frames) {
-        animation.frames.push_back(frame);
+        // 修复：使用AddFrame方法而不是直接访问frames
+        animation.AddFrame(frame.left_eye_image, frame.right_eye_image, frame.duration_ms);
     }
     return animation;
 }
