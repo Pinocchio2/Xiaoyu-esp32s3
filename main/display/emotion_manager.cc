@@ -70,7 +70,7 @@ void EmotionManager::InitializeAnimations() {
     RegisterAnimation("open_eyes", CreateYanzhuAnimation());  // 睁眼状态使用yanzhu动画
     
     // 添加listen表情
-    RegisterAnimation("listen", CreateStaticEmotion("listen", &listen_l, &listen_r));
+    //RegisterAnimation("listen", CreateStaticEmotion("listen", &listen_l, &listen_r));
     
     // 对称表情（左右眼相同）
     RegisterAnimation("laughing", CreateStaticEmotion("laughing", &funny, &funny));
@@ -94,6 +94,7 @@ void EmotionManager::InitializeAnimations() {
     
     // 特殊动画：眨眼循环
     RegisterAnimation("blinking", CreateBlinkingAnimation());
+
     RegisterAnimation("winking", CreateWinkingAnimation());
     
     // 新增yanzhu动画
@@ -101,6 +102,9 @@ void EmotionManager::InitializeAnimations() {
 
     //眼珠缩放动画
     RegisterAnimation("eyeball", CreateYanzhuScaleAnimation());
+
+    // 新增微笑动画
+    RegisterAnimation("smile", CreateSmileAnimation());
 }
 
 Animation EmotionManager::CreateStaticEmotion(const std::string& name, 
@@ -172,9 +176,24 @@ Animation EmotionManager::CreateYanzhuScaleAnimation() {
     Animation animation("eyeball", true);  // 循环播放
     
     // 添加缩放动画帧
-    animation.AddFrame(&yanzhu_da, &yanzhu_da, 300);
-    animation.AddFrame(&yanzhu_xiao, &yanzhu_xiao, 600);
-    animation.AddFrame(&yanzhu_da, &yanzhu_da, 300);
+    animation.AddFrame(&yanzhu_da_m, &yanzhu_da, 300);
+    animation.AddFrame(&yanzhu_xiao_m, &yanzhu_xiao, 600);
+    animation.AddFrame(&yanzhu_da_m, &yanzhu_da, 300);
+    
+    return animation;
+}
+
+Animation EmotionManager::CreateSmileAnimation() {
+    Animation animation("smile", false);  // 不循环播放
+    
+    // 微笑动画序列：从正常表情逐渐变成微笑
+    animation.AddFrame(&smile1, &smile1, 200);  // 微笑帧1 - 200ms
+    animation.AddFrame(&smile2, &smile2, 200);  // 微笑帧2 - 200ms  
+    animation.AddFrame(&smile3, &smile3, 200);  // 微笑帧3 - 200ms
+    animation.AddFrame(&smile4, &smile4, 500);  // 微笑帧4 - 保持500ms
+    animation.AddFrame(&smile3, &smile3, 200);  // 微笑帧3 - 200ms
+    animation.AddFrame(&smile2, &smile2, 200);  // 微笑帧2 - 200ms
+    animation.AddFrame(&smile1, &smile1, 200);  // 微笑帧1 - 200ms
     
     return animation;
 }

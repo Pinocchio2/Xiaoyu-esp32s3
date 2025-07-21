@@ -937,7 +937,7 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateSpeaking:
             display->SetStatus(Lang::Strings::SPEAKING);
-            display->SetEmotion("funny");
+            display->SetEmotion("smile");
 
             // 说话状态设置闭眼
            // SetEyeState(false);

@@ -82,6 +82,9 @@ private:
     Animation CreateYanzhuAnimation();
 
     Animation CreateYanzhuScaleAnimation();
+
+    // 新增微笑动画创建方法
+    Animation CreateSmileAnimation();
     
     std::map<std::string, Animation> animations_;  // 存储所有表情动画的映射表
     Animation default_animation_;                   // 默认的中性表情动画
