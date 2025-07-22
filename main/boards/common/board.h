@@ -50,7 +50,7 @@ public:
     virtual void SetPowerSaveMode(bool enabled) = 0;
     virtual std::string GetBoardJson() = 0;///////新增////////
     // 新增：眼睛状态控制的虚函数
-    virtual void SetEyeState(bool awake);
+    //virtual void SetEyeState(bool awake);
     
     virtual bool SupportsEyeAnimation() const;
 };

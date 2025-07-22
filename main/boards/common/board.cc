@@ -158,9 +158,9 @@ std::string Board::GetJson() {
     return json;
 }
 // 新增：眼睛状态控制的默认实现
-void Board::SetEyeState(bool awake) {
-    ESP_LOGW(TAG, "SetEyeState not implemented for this board type (awake=%s)", awake ? "true" : "false");
-}
+// void Board::SetEyeState(bool awake) {
+//     ESP_LOGW(TAG, "SetEyeState not implemented for this board type (awake=%s)", awake ? "true" : "false");
+// }
 
 bool Board::SupportsEyeAnimation() const {
     return false;  // 默认不支持眼睛动画

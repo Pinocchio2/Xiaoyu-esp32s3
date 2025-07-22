@@ -57,7 +57,7 @@ private:
     Animation CreateBlinkingAnimation();
     
     // 创建眨眼循环动画的辅助方法
-    Animation CreateWinkingAnimation();
+    // Animation CreateWinkingAnimation();
     
     Animation CreateYanzhuAnimation();
 
@@ -65,6 +65,9 @@ private:
 
     // 新增微笑动画创建方法
     Animation CreateSmileAnimation();
+
+    //新增睡眠动画
+    Animation CreateSleepAnimation();
     
     std::map<std::string, Animation> animations_;  // 存储所有表情动画的映射表
     Animation default_animation_;                   // 默认的中性表情动画

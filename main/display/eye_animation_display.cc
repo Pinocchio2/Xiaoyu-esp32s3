@@ -57,8 +57,8 @@ bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
     // 统一停止上一个动画 - 移到这里确保所有分支都会执行
     StopAnimation();
 
-    ESP_LOGI(TAG, "请求播放动画: %s (类型: %s)", animation.name.c_str(),
-             animation.type == Animation::Type::IMAGE_SEQUENCE ? "图片序列" : "程序化");
+    //ESP_LOGI(TAG, "请求播放动画: %s (类型: %s)", animation.name.c_str(),
+            // animation.type == Animation::Type::IMAGE_SEQUENCE ? "图片序列" : "程序化");
              
     lv_obj_t* scr_left = primary_display_ ? lv_disp_get_scr_act(primary_display_->getLvDisplay()) : nullptr;
     lv_obj_t* scr_right = secondary_display_ ? lv_disp_get_scr_act(secondary_display_->getLvDisplay()) : nullptr;
@@ -80,19 +80,19 @@ bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
         if (!left_eye_img_) {
             left_eye_img_ = lv_img_create(scr_left);
             lv_obj_align(left_eye_img_, LV_ALIGN_CENTER, 0, 0);
-            ESP_LOGI(TAG, "重新创建左眼图像对象");
+            //ESP_LOGI(TAG, "重新创建左眼图像对象");
         }
         if (!right_eye_img_) {
             right_eye_img_ = lv_img_create(scr_right);
             lv_obj_align(right_eye_img_, LV_ALIGN_CENTER, 0, 0);
-            ESP_LOGI(TAG, "重新创建右眼图像对象");
+            ///ESP_LOGI(TAG, "重新创建右眼图像对象");
         }
         
         // 确保它们可见
         lv_obj_clear_flag(left_eye_img_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(right_eye_img_, LV_OBJ_FLAG_HIDDEN);
         
-        // --- 剩下的图片序列动画逻辑保持不变 ---
+        
         current_animation_ = &animation;
         is_looping_ = animation.loop;
         current_frame_index_ = 0;
@@ -324,7 +324,7 @@ void EyeAnimationDisplay::Unlock() {
 
 
 void EyeAnimationDisplay::SetEmotion(const char* emotion) {
-    ESP_LOGI(TAG, "设置眼睛表情: %s", emotion ? emotion : "null");
+   // ESP_LOGI(TAG, "设置眼睛表情: %s", emotion ? emotion : "null");
     
     if (emotion == nullptr) {
         ESP_LOGW(TAG, "表情名称为空，使用默认表情");

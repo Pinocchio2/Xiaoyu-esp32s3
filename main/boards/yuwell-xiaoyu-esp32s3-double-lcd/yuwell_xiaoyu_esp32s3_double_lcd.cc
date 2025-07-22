@@ -50,9 +50,6 @@ public:
     // 重写的虚函数声明
     virtual Display* GetDisplay() override;
     virtual AudioCodec* GetAudioCodec() override;
-
-    // 眼睛状态控制方法（保持兼容性）
-    virtual void SetEyeState(bool awake) override;
     virtual bool SupportsEyeAnimation() const override;
     
     // 获取显示管理器（如果需要直接访问）
@@ -72,8 +69,6 @@ public:
     }
 };
 
-// --- 类的成员函数定义部分 ---
-
 // 构造函数实现
 // 在文件顶部添加全局变量声明
 DualDisplayManager* g_dual_display_manager = nullptr;
@@ -89,25 +84,16 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     InitUart();
     InitializeButtons();
     InitializeIot();
-
-    // 显示系统初始化 - 重构重点
     dual_display_manager_.Initialize();
-    
-    // 设置全局引用
     g_dual_display_manager = &dual_display_manager_;
-    
     // 创建EyeAnimationDisplay对象，去掉UI只保留双屏眼睛
-    eye_display_ = new EyeAnimationDisplay();
-    
+    eye_display_ = new EyeAnimationDisplay();    
     // 初始化背光（新增）
-    if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
-        GetBacklight()->SetBrightness(100);  // 设置为100%亮度，但由于INVERT=true，实际输出低电平
-    }
+    if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) { GetBacklight()->SetBrightness(100); } 
     
     ESP_LOGI(TAG, "Board initialization complete.");
     
-    // 使用统一接口设置初始表情
-    eye_display_->SetEmotion("close_eye");  
+    eye_display_->SetEmotion("blinking");  
 
 }
 
@@ -201,18 +187,6 @@ Display* YuwellXiaoyuEsp32S3BoardDoubleLcd::GetDisplay() {
 }
 
 
-// 新增：重写眼睛状态控制方法
-void YuwellXiaoyuEsp32S3BoardDoubleLcd::SetEyeState(bool awake) {
-    if (eye_display_) {
-        if (awake) {
-            // 使用yanzhu动画表示设备醒着状态
-            eye_display_->SetEmotion("orbiting");
-        } else {
-            // 使用表情管理器设置闭眼表情
-            eye_display_->SetEmotion("close_eye");
-        }
-    }
-}
 
 bool YuwellXiaoyuEsp32S3BoardDoubleLcd::SupportsEyeAnimation() const {
     return true;  // 双屏板卡支持眼睛动画

@@ -97,15 +97,16 @@ void Application::CheckNewVersion() {
         retry_delay = 10; // 重置重试延迟时间
 
         if (ota_.HasNewVersion()) {
-            Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "happy", Lang::Sounds::P3_UPGRADE);
+            //
+            //Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "happy", Lang::Sounds::P3_UPGRADE);
 
             vTaskDelay(pdMS_TO_TICKS(3000));
 
             SetDeviceState(kDeviceStateUpgrading);
             
-            display->SetIcon(FONT_AWESOME_DOWNLOAD);
+            //display->SetIcon(FONT_AWESOME_DOWNLOAD);
             std::string message = std::string(Lang::Strings::NEW_VERSION) + ota_.GetFirmwareVersion();
-            display->SetChatMessage("system", message.c_str());
+            //display->SetChatMessage("system", message.c_str());
 
             auto& board = Board::GetInstance();
             board.SetPowerSaveMode(false);
@@ -132,7 +133,7 @@ void Application::CheckNewVersion() {
             });
 
             // If upgrade success, the device will reboot and never reach here
-            display->SetStatus(Lang::Strings::UPGRADE_FAILED);
+            //display->SetStatus(Lang::Strings::UPGRADE_FAILED);
             ESP_LOGI(TAG, "Firmware upgrade failed...");
             vTaskDelay(pdMS_TO_TICKS(3000));
             Reboot();
@@ -147,7 +148,7 @@ void Application::CheckNewVersion() {
             break;
         }
 
-        display->SetStatus(Lang::Strings::ACTIVATION);
+        //display->SetStatus(Lang::Strings::ACTIVATION);
         // Activation code is shown to the user and waiting for the user to input
         if (ota_.HasActivationCode()) {
             ShowActivationCode();
@@ -205,12 +206,19 @@ void Application::ShowActivationCode() {
     }
 }
 
+// 定义一个名为Application的类，其中包含一个名为Alert的成员函数
 void Application::Alert(const char* status, const char* message, const char* emotion, const std::string_view& sound) {
+    // 打印警告日志，包含状态、消息和情感
     ESP_LOGW(TAG, "Alert %s: %s [%s]", status, message, emotion);
+    // 获取当前实例的显示对象
     auto display = Board::GetInstance().GetDisplay();
+    // 设置显示对象的状态
     display->SetStatus(status);
+    // 设置显示对象的情感
     display->SetEmotion(emotion);
+    // 设置显示对象的聊天消息
     display->SetChatMessage("system", message);
+    // 如果声音不为空，则重置解码器并播放声音
     if (!sound.empty()) {
         ResetDecoder();
         PlaySound(sound);
@@ -255,21 +263,7 @@ void Application::PlaySound(const std::string_view& sound) {
     }
 }
 
-////////////////////////////////////////////////// 新增：眼睛状态控制方法
-void Application::SetEyeState(bool awake) {
-    auto& board = Board::GetInstance();
-    
-    // 检查当前板卡是否支持眼睛动画
-    if (!board.SupportsEyeAnimation()) {
-        ESP_LOGD(TAG, "当前板卡不支持眼睛动画功能");
-        return;
-    }
-    
-    // 确保在主线程中执行 UI 操作
-    Schedule([&board, awake]() {
-        board.SetEyeState(awake);
-    });
-}
+
 
 
 void Application::ToggleChatState() {
@@ -331,13 +325,6 @@ void Application::ChangeChatState() {
         });
         
     } else if (device_state_ == kDeviceStateListening) {
-        // Schedule([this]() {
-
-        //     //重新监听
-        //     ESP_LOGI(TAG, "===>重新监听");
-
-        //     SetListeningMode(realtime_chat_enabled_ ? kListeningModeRealtime : kListeningModeAutoStop);
-        // });
     }
 }
 
@@ -393,13 +380,13 @@ void Application::StopListening() {
 void Application::Start() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
-
+    
+    EmotionManager::GetInstance().PreloadAllAnimations();
     /* Setup the display */
     auto display = board.GetDisplay();
     
-    // 初始化表情动画 - 添加这一行
-    EmotionManager::GetInstance().InitializeAnimations();  // 添加这行
-    EmotionManager::GetInstance().PreloadAllAnimations();
+    
+    
 
     /* Setup the audio codec */
     auto codec = board.GetAudioCodec();
@@ -484,8 +471,7 @@ void Application::Start() {
     protocol_->OnAudioChannelClosed([this, &board]() {
         board.SetPowerSaveMode(true);
 
-        // //////////////////////////////////////会话结束时设置眼睛为闭眼状态
-        SetEyeState(false);
+       
 
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
@@ -615,8 +601,7 @@ void Application::Start() {
     wake_word_detect_.OnWakeWordDetected([this](const std::string& wake_word) {
         ESP_LOGI(TAG, "Wake word detected: %s", wake_word.c_str());
         
-        ////////////////////////////////////////// 语音唤醒后设置眼睛为睁眼状态
-        SetEyeState(true);
+        
         
         Schedule([this, wake_word]() {
             if (device_state_ == kDeviceStateIdle) {
@@ -886,8 +871,8 @@ void Application::SetDeviceState(DeviceState state) {
     led->OnStateChanged();
     switch (state) {
         case kDeviceStateUnknown:
-        case kDeviceStateIdle:
-            display->SetStatus(Lang::Strings::STANDBY);
+        case kDeviceStateIdle://
+            //display->SetStatus(Lang::Strings::STANDBY);
             display->SetEmotion("orbiting");
             // 空闲状态设置闭眼
             //SetEyeState(false);
@@ -900,14 +885,14 @@ void Application::SetDeviceState(DeviceState state) {
 #endif
             break;
         case kDeviceStateConnecting:
-            display->SetStatus(Lang::Strings::CONNECTING);
+            //display->SetStatus(Lang::Strings::CONNECTING);
             display->SetEmotion("orbiting");
             display->SetChatMessage("system", "");
             // 连接状态设置闭眼
             //SetEyeState(false);
             break;
         case kDeviceStateListening:
-            display->SetStatus(Lang::Strings::LISTENING);
+            //display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("listening");
             // 倾听状态设置睁眼
             //SetEyeState(true);
@@ -937,7 +922,8 @@ void Application::SetDeviceState(DeviceState state) {
             }
             break;
         case kDeviceStateSpeaking:
-            display->SetStatus(Lang::Strings::SPEAKING);
+            //display->SetStatus(Lang::Strings::SPEAKING);
+
             display->SetEmotion("smile");
 
             // 说话状态设置闭眼
@@ -1038,8 +1024,8 @@ bool Application::CanEnterSleepMode() {
 
 
 void Application::UartListenTask() {
-    ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
-    ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
+    // ESP_LOGI(TAG, "UART监听任务已开始运行，任务ID: %p", xTaskGetCurrentTaskHandle());
+    // ESP_LOGI(TAG, "UART监听配置 - 端口: UART_NUM_2, 缓冲区大小: 1024字节");
 
     const int buffer_size = 1024;
     uint8_t* buffer = (uint8_t*)malloc(buffer_size);

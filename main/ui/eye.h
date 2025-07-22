@@ -4,7 +4,7 @@
 #include "lvgl.h"
 
 // 声明所有眼睛图案
-extern const lv_img_dsc_t biyan;
+//extern const lv_img_dsc_t biyan;
 extern const lv_img_dsc_t zhenyan;
 // extern const lv_img_dsc_t crying_l;
 // extern const lv_img_dsc_t crying_r;
@@ -44,5 +44,10 @@ extern const lv_img_dsc_t smile2;
 extern const lv_img_dsc_t smile3;       
 extern const lv_img_dsc_t smile4;
 
+extern const lv_img_dsc_t sleep0;
+extern const lv_img_dsc_t sleep1;
+extern const lv_img_dsc_t sleep2;
+extern const lv_img_dsc_t sleep3;
 
+extern const lv_img_dsc_t Black;
 #endif  // UI_EYE_H_

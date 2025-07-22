@@ -38,6 +38,8 @@ static void anim_path_cb(void * var, int32_t v) {
 void create_orbiting_eye_anim_on_screen(lv_obj_t* scr) {
     // 设置屏幕背景颜色为黑色
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+    lv_anim_del(scr, NULL);
+
     lv_obj_clean(scr); // 清理屏幕
 
     // 创建眼白
@@ -89,6 +91,8 @@ static void scale_anim_cb(void * var, int32_t v) {
 void create_scaling_eye_anim_on_screen(lv_obj_t* scr) {
     // 设置屏幕背景颜色为黑色
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+
+    lv_anim_del(scr, NULL);
     lv_obj_clean(scr); // 清理屏幕
 
     // 创建眼白（固定大小）
@@ -163,7 +167,8 @@ static void breathing_arc_cb(void * var, int32_t v) {
 void create_breathing_eye_on_screen(lv_obj_t* scr) {
     if (!scr) return;
 
-    // 1. 清理屏幕并设置背景为黑色
+    
+    lv_anim_del(scr, NULL);
     lv_obj_clean(scr); 
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
 
@@ -206,14 +211,12 @@ EmotionManager::EmotionManager() {
     // 创建呼吸式闭眼动画，更加自然
     Animation default_anim("default", true);  // 循环播放
     
-    // 主要闭眼状态
-    default_anim.AddFrame(&biyan, &biyan, 2000);  // 闭眼2秒
-    
-    // 轻微"呼吸"效果 - 使用不同的眼睛状态
-    default_anim.AddFrame(&zhayang4, &zhayang4, 300);  // 微微动一下
-    default_anim.AddFrame(&biyan, &biyan, 2000);      // 回到闭眼状态
-    default_anim.AddFrame(&zhayang4, &zhayang4, 200);  // 再次微动
-    default_anim.AddFrame(&biyan, &biyan, 1500);      // 闭眼1.5秒
+    default_anim.AddFrame(&sleep0, &sleep0, 200);
+    default_anim.AddFrame(&sleep1, &sleep1, 200);  
+    default_anim.AddFrame(&sleep2, &sleep2, 200);  
+    default_anim.AddFrame(&sleep3, &sleep3, 500); 
+    default_anim.AddFrame(&sleep2, &sleep2, 200);
+    default_anim.AddFrame(&sleep1, &sleep1, 200);
     
     default_animation_ = default_anim;
 }
@@ -267,46 +270,44 @@ const Animation& EmotionManager::GetDefaultAnimation() const {
 void EmotionManager::InitializeAnimations() {
 
     // 基础静态表情
-    RegisterAnimation("neutral", CreateStaticEmotion("neutral", &zhenyan , &zhenyan ));
+    RegisterAnimation("neutral", CreateStaticEmotion("neutral", &Black , &Black ));
    // RegisterAnimation("happy", CreateStaticEmotion("happy", &happy, &happy));
    // RegisterAnimation("sad", CreateStaticEmotion("sad", &crying_l, &crying_r));
    // RegisterAnimation("funny", CreateStaticEmotion("funny", &funny, &funny));
-    RegisterAnimation("sleepy", CreateStaticEmotion("sleepy", &biyan , &biyan ));
-    
+        
     // 添加眼睛状态表情 - 新增这两行
-    RegisterAnimation("closed_eyes", CreateStaticEmotion("closed_eyes", &biyan, &biyan));  // 闭眼状态
-    RegisterAnimation("open_eyes", CreateYanzhuAnimation());  // 睁眼状态使用yanzhu动画
+    //RegisterAnimation("closed_eyes", CreateStaticEmotion("closed_eyes", &biyan, &biyan));  // 闭眼状态
+    //RegisterAnimation("open_eyes", CreateYanzhuAnimation());  // 睁眼状态使用yanzhu动画
     
     // 添加listen表情
     //RegisterAnimation("listen", CreateStaticEmotion("listen", &listen_l, &listen_r));
     
     // 对称表情（左右眼相同）
     //RegisterAnimation("laughing", CreateStaticEmotion("laughing", &funny, &funny));
-    RegisterAnimation("angry", CreateStaticEmotion("angry", &neutral, &neutral));  // 暂时用neutral代替
+    //RegisterAnimation("angry", CreateStaticEmotion("angry", &neutral, &neutral));  // 暂时用neutral代替
     //RegisterAnimation("crying", CreateStaticEmotion("crying", &crying_l, &crying_r));
     //RegisterAnimation("loving", CreateStaticEmotion("loving", &happy, &happy));  // 暂时用happy代替
-    RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral, &neutral));
-    RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan , &zhenyan ));
-    RegisterAnimation("shockeinkid", CreateStaticEmotion("shocked", &zhenyan , &zhenyan ));
-    RegisterAnimation("thng", CreateStaticEmotion("thinking", &neutral, &neutral));
-    RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral, &neutral));
-    RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan , &biyan ));
+    //RegisterAnimation("embarrassed", CreateStaticEmotion("embarrassed", &neutral, &neutral));
+    //RegisterAnimation("surprised", CreateStaticEmotion("surprised", &zhenyan , &zhenyan ));
+    //RegisterAnimation("shockeinkid", CreateStaticEmotion("shocked", &zhenyan , &zhenyan ));
+    //RegisterAnimation("thng", CreateStaticEmotion("thinking", &neutral, &neutral));
+    //RegisterAnimation("cool", CreateStaticEmotion("cool", &neutral, &neutral));
+    //RegisterAnimation("relaxed", CreateStaticEmotion("relaxed", &biyan , &biyan ));
     // RegisterAnimation("delicious", CreateStaticEmotion("delicious", &happy, &happy));
     // RegisterAnimation("kissy", CreateStaticEmotion("kissy", &happy, &happy));
-    RegisterAnimation("confident", CreateStaticEmotion("confident", &zhenyan , &zhenyan ));
+    //RegisterAnimation("confident", CreateStaticEmotion("confident", &zhenyan , &zhenyan ));
     // RegisterAnimation("silly", CreateStaticEmotion("silly", &funny, &funny));
-    RegisterAnimation("confused", CreateStaticEmotion("confused", &neutral, &neutral));
-    
-    // 特殊动画：眨眼（左眼眨，右眼睁开）
-    RegisterAnimation("winking", CreateWinkingAnimation());
+    //RegisterAnimation("confused", CreateStaticEmotion("confused", &neutral, &neutral));
+    //RegisterAnimation("winking", CreateWinkingAnimation());
     
     // 特殊动画：眨眼循环
     RegisterAnimation("blinking", CreateBlinkingAnimation());
 
-    RegisterAnimation("winking", CreateWinkingAnimation());
-    
     // 新增yanzhu动画
     RegisterAnimation("yanzhu", CreateYanzhuAnimation());
+
+    //新增睡眠动画
+    RegisterAnimation("sleep", CreateSleepAnimation());
 
     //眼珠缩放动画
     RegisterAnimation("eyeball", CreateYanzhuScaleAnimation());
@@ -342,15 +343,7 @@ Animation EmotionManager::CreateDynamicEmotion(const std::string& name,
     return animation;
 }
 
-// 创建眨眼动画的私有方法
-Animation EmotionManager::CreateWinkingAnimation() {
-    Animation animation("winking", false);
-    // 左眼眨，右眼睁开，持续500ms
-    animation.AddFrame(&biyan, &zhenyan, 500);
-    // 恢复双眼睁开
-    animation.AddFrame(&zhenyan, &zhenyan, 0);
-    return animation;
-}
+
 
 // 创建眨眼循环动画的私有方法
 Animation EmotionManager::CreateBlinkingAnimation() {
@@ -398,7 +391,7 @@ Animation EmotionManager::CreateYanzhuScaleAnimation() {
 }
 
 Animation EmotionManager::CreateSmileAnimation() {
-    Animation animation("smile", false);  // 不循环播放
+    Animation animation("smile", true);  // 不循环播放
     
     // 微笑动画序列：从正常表情逐渐变成微笑
     animation.AddFrame(&smile1, &smile1, 200);  // 微笑帧1 - 200ms
@@ -412,5 +405,19 @@ Animation EmotionManager::CreateSmileAnimation() {
     return animation;
 }
 
+//睡眠动画
+Animation EmotionManager:: CreateSleepAnimation(){ 
+    Animation animation("sleep", false); 
+
+    animation.AddFrame(&sleep0, &sleep0, 200);  
+    animation.AddFrame(&sleep1, &sleep1, 200);  
+    animation.AddFrame(&sleep2, &sleep2, 200);  
+    animation.AddFrame(&sleep3, &sleep3, 500); 
+    animation.AddFrame(&sleep2, &sleep2, 200);
+    animation.AddFrame(&sleep1, &sleep1, 200);
+
+    return animation;
+ 
+}
 
 
