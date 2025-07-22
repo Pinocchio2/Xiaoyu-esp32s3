@@ -87,15 +87,27 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
                            DisplayFonts fonts)
     : LcdDisplay(panel_io, panel, fonts) {
     
-    
-    
     width_ = width;
     height_ = height;
 
-    // draw white
-    std::vector<uint16_t> buffer(width_, 0xFFFF);
-    for (int y = 0; y < height_; y++) {
-        esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, y + 1, buffer.data());
+    // 一次性绘制白色背景 - 更高效的方法
+    std::vector<uint16_t> buffer(width_ * height_, 0xFFFF);
+    esp_err_t ret = esp_lcd_panel_draw_bitmap(panel_, 0, 0, width_, height_, buffer.data());
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "初始化显示屏白色背景失败: %s", esp_err_to_name(ret));
+        // 如果一次性绘制失败，回退到分块绘制
+        ESP_LOGW(TAG, "回退到分块绘制模式");
+        buffer.resize(width_);
+        std::fill(buffer.begin(), buffer.end(), 0xFFFF);
+        
+        for (int y = 0; y < height_; y += 10) { // 每次绘制10行
+            int end_y = std::min(y + 10, height_);
+            ret = esp_lcd_panel_draw_bitmap(panel_, 0, y, width_, end_y, buffer.data());
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "绘制第%d-%d行失败: %s", y, end_y-1, esp_err_to_name(ret));
+            }
+            vTaskDelay(pdMS_TO_TICKS(2)); // 添加延迟避免队列溢出
+        }
     }
 
     // Set the display to on

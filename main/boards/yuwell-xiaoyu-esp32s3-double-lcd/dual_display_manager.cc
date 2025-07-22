@@ -49,7 +49,7 @@ void DualDisplayManager::Initialize() {
     
     // 优化配置：降低刷新频率，减少CPU负载
     port_cfg.task_priority = 3;        // 降低优先级，避免与系统任务冲突
-    port_cfg.timer_period_ms = 16;     // 约60FPS，平衡流畅度和性能
+    port_cfg.timer_period_ms = 30;     // 约60FPS，平衡流畅度和性能
     port_cfg.task_max_sleep_ms = 500;  // 增加最大休眠时间
     port_cfg.task_stack = 6144;   // 增加栈大小，避免栈溢出
     
@@ -71,7 +71,7 @@ void DualDisplayManager::Initialize() {
     io_config1.dc_gpio_num = DISPLAY_DC_PIN;
     io_config1.spi_mode = DISPLAY_SPI_MODE;
     io_config1.pclk_hz = 80 * 1000 * 1000;
-    io_config1.trans_queue_depth = 10;
+    io_config1.trans_queue_depth = 20;
     io_config1.lcd_cmd_bits = 8;
     io_config1.lcd_param_bits = 8;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config1, &panel_io1));
@@ -79,7 +79,7 @@ void DualDisplayManager::Initialize() {
     esp_lcd_panel_dev_config_t panel_config1 = {};
     panel_config1.reset_gpio_num = DISPLAY_RST_PIN;
     panel_config1.rgb_ele_order = DISPLAY_RGB_ORDER;
-    panel_config1.bits_per_pixel = 16;
+    panel_config1.bits_per_pixel = 16; //
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io1, &panel_config1, &panel1));
     
     esp_lcd_panel_reset(panel1);
@@ -104,7 +104,7 @@ void DualDisplayManager::Initialize() {
     io_config2.dc_gpio_num = DISPLAY_DC_PIN;
     io_config2.spi_mode = DISPLAY_SPI_MODE;
     io_config2.pclk_hz = 80 * 1000 * 1000;
-    io_config2.trans_queue_depth = 10;
+    io_config2.trans_queue_depth = 20;
     io_config2.lcd_cmd_bits = 8;
     io_config2.lcd_param_bits = 8;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config2, &panel_io2));
@@ -112,7 +112,7 @@ void DualDisplayManager::Initialize() {
     esp_lcd_panel_dev_config_t panel_config2 = {};
     panel_config2.reset_gpio_num = -1; // 副屏通常不需要独立的复位引脚
     panel_config2.rgb_ele_order = DISPLAY_RGB_ORDER;
-    panel_config2.bits_per_pixel = 16;
+    panel_config2.bits_per_pixel = 16;//
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io2, &panel_config2, &panel2));
     
     esp_lcd_panel_init(panel2);

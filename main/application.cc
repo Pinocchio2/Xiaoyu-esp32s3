@@ -398,6 +398,7 @@ void Application::Start() {
     auto display = board.GetDisplay();
     
     // 初始化表情动画 - 添加这一行
+    EmotionManager::GetInstance().InitializeAnimations();  // 添加这行
     EmotionManager::GetInstance().PreloadAllAnimations();
 
     /* Setup the audio codec */
@@ -907,7 +908,7 @@ void Application::SetDeviceState(DeviceState state) {
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("eyeball");
+            display->SetEmotion("listening");
             // 倾听状态设置睁眼
             //SetEyeState(true);
 

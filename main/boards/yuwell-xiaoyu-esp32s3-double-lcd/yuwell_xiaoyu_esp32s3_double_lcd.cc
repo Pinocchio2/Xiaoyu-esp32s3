@@ -107,7 +107,8 @@ YuwellXiaoyuEsp32S3BoardDoubleLcd::YuwellXiaoyuEsp32S3BoardDoubleLcd() :
     ESP_LOGI(TAG, "Board initialization complete.");
     
     // 使用统一接口设置初始表情
-    eye_display_->SetEmotion("closed_eyes");  // 替代原来的 SetEyeState(false)
+    eye_display_->SetEmotion("close_eye");  
+
 }
 
 // 初始化串口
@@ -208,7 +209,7 @@ void YuwellXiaoyuEsp32S3BoardDoubleLcd::SetEyeState(bool awake) {
             eye_display_->SetEmotion("orbiting");
         } else {
             // 使用表情管理器设置闭眼表情
-            eye_display_->SetEmotion("closed_eyes");
+            eye_display_->SetEmotion("close_eye");
         }
     }
 }

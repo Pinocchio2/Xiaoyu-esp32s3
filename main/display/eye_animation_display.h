@@ -46,7 +46,7 @@ private:
     Display* primary_display_ = nullptr;
     Display* secondary_display_ = nullptr;
     
-    // --- 新增：用于追踪程序化动画的状态 ---
+    
     bool is_programmatic_anim_active_ = false;
 
     // 添加静态成员声明

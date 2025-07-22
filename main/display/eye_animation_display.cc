@@ -29,12 +29,7 @@ void EyeAnimationDisplay::StopAnimation() {
     // 2. 如果之前是程序化动画，只清理屏幕上的临时对象
     if (is_programmatic_anim_active_) {
         ESP_LOGD(TAG, "清理程序化动画...");
-        // 清理屏幕会删除所有子对象，所以我们只清理动画创建的根对象
-        // 这里假设程序化动画创建函数把所有东西都放在一个容器里返回
-        // 但根据您提供的代码，它直接在屏幕上创建，所以lv_obj_clean是必要的
-        // 但这会破坏img对象。
-        // **正确做法**：不清理屏幕，而是让程序化动画返回它创建的根对象，然后我们在这里删除它。
-        // **当前修正**：我们将接受清理屏幕，但在播放图片动画前重新创建img对象。
+       
         if (primary_display_) {
             lv_obj_clean(lv_disp_get_scr_act(primary_display_->getLvDisplay()));
             // 因为 clean 了，所以 img 对象也没了
@@ -260,51 +255,6 @@ EyeAnimationDisplay::~EyeAnimationDisplay() {
     }
 }
 
-// 删除这个重复的方法定义（第259-299行）
-/*
-bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
-    if (!animation.IsValid()) {
-        ESP_LOGW(TAG, "无效的动画");
-        return false;
-    }
-    
-    if (!left_eye_img_ || !right_eye_img_) {
-        ESP_LOGE(TAG, "眼睛图像对象未初始化");
-        return false;
-    }
-    
-    // 修复：使用 static_cast 转换 size() 为 int
-    ESP_LOGI(TAG, "开始播放动画: %s，帧数: %d", animation.name.c_str(), static_cast<int>(animation.frames.size()));
-    
-    // 停止之前的动画
-    StopAnimation();
-    
-    current_animation_ = &animation;
-    current_frame_index_ = 0;  // 使用正确的成员变量名
-    is_looping_ = animation.loop;  // 使用新增的成员变量
-    
-    // 创建动画定时器（只创建一次，避免频繁创建删除）
-    if (!animation_timer_) {
-        esp_timer_create_args_t timer_args = {
-            .callback = &EyeAnimationDisplay::animation_timer_callback,
-            .arg = this,
-            .name = "eye_anim_timer"
-        };
-        
-        esp_err_t ret = esp_timer_create(&timer_args, &animation_timer_);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "创建动画定时器失败: %s", esp_err_to_name(ret));
-            return false;
-        }
-    }
-    
-    // 立即显示第一帧
-    PlayNextFrame();
-    
-    return true;
-}
-*/
-
 
 // 静态成员定义
 EyeAnimationDisplay::ImageUpdateData EyeAnimationDisplay::left_eye_data_;
@@ -318,12 +268,14 @@ void EyeAnimationDisplay::update_image_callback(void* user_data) {
     }
 }
 
-void EyeAnimationDisplay::PlayNextFrame() {
+// in file: main/display/eye_animation_display.cc
 
+void EyeAnimationDisplay::PlayNextFrame() {
+    // 步骤 1: 加上之前建议的锁，这是保证线程安全的前提
     DisplayLockGuard lock(this);
 
-    // 修复：使用正确的成员访问方式
-    if (!current_animation_ || 
+    // 步骤 2: 检查当前动画状态，这部分逻辑不变
+    if (!current_animation_ ||
         current_animation_->type != Animation::Type::IMAGE_SEQUENCE ||
         !current_animation_->image_sequence.frames ||
         current_frame_index_ >= static_cast<int>(current_animation_->image_sequence.frames->size())) {
@@ -331,35 +283,30 @@ void EyeAnimationDisplay::PlayNextFrame() {
         return;
     }
 
-    // 修复：使用正确的成员访问方式
     const auto& frame = (*current_animation_->image_sequence.frames)[current_frame_index_];
-    
-    // 使用异步调用更新图像
-    if (frame.left_eye_image) {
-        left_eye_data_.img_obj = left_eye_img_;
-        left_eye_data_.img_src = frame.left_eye_image;
-        lv_async_call(update_image_callback, &left_eye_data_);
+
+    // 步骤 3: 【核心修改】直接调用 lv_img_set_src, 替换掉原来的 lv_async_call
+    if (frame.left_eye_image && left_eye_img_) {
+        lv_img_set_src(left_eye_img_, frame.left_eye_image);
     }
-    
-    if (frame.right_eye_image) {
-        right_eye_data_.img_obj = right_eye_img_;
-        right_eye_data_.img_src = frame.right_eye_image;
-        lv_async_call(update_image_callback, &right_eye_data_);
+
+    if (frame.right_eye_image && right_eye_img_) {
+        lv_img_set_src(right_eye_img_, frame.right_eye_image);
     }
-    
-    // 设置下一帧的定时器
+
+    // 步骤 4: 播放完当前帧后，启动下一帧的定时器，逻辑不变
     if (frame.duration_ms > 0) {
-        esp_timer_start_once(animation_timer_, frame.duration_ms * 1000); // 转换为微秒
+        esp_timer_start_once(animation_timer_, frame.duration_ms * 1000);
     }
-    
+
     current_frame_index_++;
-    
-    // 检查是否需要循环
+
+    // 步骤 5: 判断动画是否结束，逻辑不变
     if (current_frame_index_ >= static_cast<int>(current_animation_->image_sequence.frames->size())) {
         if (is_looping_) {
-            current_frame_index_ = 0; // 重新开始
+            current_frame_index_ = 0; // 循环播放则重置索引
         } else {
-            StopAnimation(); // 停止动画
+            StopAnimation(); // 不循环则停止动画
         }
     }
 }
@@ -375,10 +322,7 @@ void EyeAnimationDisplay::Unlock() {
     lvgl_port_unlock();
 }
 
-/**
- * @brief 设置情感表情 - 眼睛动画实现
- * @param emotion 情感名称
- */
+
 void EyeAnimationDisplay::SetEmotion(const char* emotion) {
     ESP_LOGI(TAG, "设置眼睛表情: %s", emotion ? emotion : "null");
     

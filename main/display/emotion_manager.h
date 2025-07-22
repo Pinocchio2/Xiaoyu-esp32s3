@@ -19,37 +19,20 @@ public:
         return instance;
     }
     
-    /**
-     * @brief 根据表情名称获取对应的动画
-     * @param emotion_name 表情名称（如 "happy", "sad" 等）
-     * @return 对应的动画对象，如果找不到则返回默认中性表情
-     */
+    // 初始化所有预定义的表情动画
+    void InitializeAnimations();
+   
     const Animation& GetAnimation(const std::string& emotion_name);
     
-    /**
-     * @brief 预加载所有动画
-     * 在系统启动时调用，初始化所有预定义的表情动画
-     */
-    void PreloadAllAnimations();
     
-    /**
-     * @brief 注册一个新的表情动画
-     * @param emotion_name 表情名称
-     * @param animation 动画对象
-     */
+    void PreloadAllAnimations();
+   
     void RegisterAnimation(const std::string& emotion_name, const Animation& animation);
     
-    /**
-     * @brief 检查是否存在指定的表情动画
-     * @param emotion_name 表情名称
-     * @return true 如果存在，false 如果不存在
-     */
+    
     bool HasAnimation(const std::string& emotion_name) const;
     
-    /**
-     * @brief 获取默认的中性表情动画
-     * @return 默认动画对象
-     */
+   
     const Animation& GetDefaultAnimation() const;
 
 private:
@@ -59,9 +42,6 @@ private:
     // 禁用拷贝构造和赋值操作
     EmotionManager(const EmotionManager&) = delete;
     EmotionManager& operator=(const EmotionManager&) = delete;
-    
-    // 初始化所有预定义的表情动画
-    void InitializeAnimations();
     
     // 创建静态表情动画的辅助方法
     Animation CreateStaticEmotion(const std::string& name, 
