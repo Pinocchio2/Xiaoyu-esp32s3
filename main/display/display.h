@@ -30,6 +30,7 @@ public:
     virtual void SetTheme(const std::string& theme_name);
     
     virtual bool PlayAnimation(const Animation& animation) = 0;
+   
 
     virtual std::string GetTheme() { return current_theme_name_; }
 

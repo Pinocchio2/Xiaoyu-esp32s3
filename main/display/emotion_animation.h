@@ -1,79 +1,107 @@
 #ifndef EMOTION_ANIMATION_H
 #define EMOTION_ANIMATION_H
 
+#include "lvgl.h"
 #include <vector>
 #include <string>
-#include "lvgl.h"
 
-// 动画帧结构体 (用于图片序列动画)
+// 定义动画帧结构体
 struct AnimationFrame {
     const lv_img_dsc_t* left_eye_image;
     const lv_img_dsc_t* right_eye_image;
-    uint32_t duration_ms;
-
-    AnimationFrame(const lv_img_dsc_t* left, const lv_img_dsc_t* right, uint32_t duration = 0)
-        : left_eye_image(left), right_eye_image(right), duration_ms(duration) {}
+    int duration_ms;
 };
 
-// 定义一个函数指针类型，用于创建程序化LVGL动画
-// 参数: parent_left - 左眼屏幕, parent_right - 右眼屏幕
-using lvgl_anim_creator_t = void (*)(lv_obj_t* parent_left, lv_obj_t* parent_right);
+// 定义程序化动画的创建函数指针类型
+using ProgrammaticAnimCreator = void (*)(lv_obj_t*, lv_obj_t*);
 
-// 动画结构体 (已扩展)
+// 核心的动画结构体定义
 struct Animation {
-    // 枚举动画类型
     enum class Type {
-        IMAGE_SEQUENCE,     // 图片序列帧动画 (旧方式)
-        LVGL_PROGRAMMATIC   // LVGL程序化动画 (新方式)
+        IMAGE_SEQUENCE,
+        LVGL_PROGRAMMATIC
     };
 
     std::string name;
+    Type type;
     bool loop;
-    Type type; // 新增：动画类型
 
-    // 使用 union 存储不同类型的数据
+    // 根据动画类型使用不同的数据结构
     union {
-        // 图片序列动画的数据 (保持不变)
+        // 用于图片序列动画
         struct {
-             std::vector<AnimationFrame>* frames;
+            std::vector<AnimationFrame>* frames;
         } image_sequence;
 
-        // 程序化动画的数据
+        // 用于程序化LVGL动画
         struct {
-            lvgl_anim_creator_t creator_func; // 指向创建函数
+            ProgrammaticAnimCreator creator_func;
         } programmatic;
     };
 
-    // --- 构造函数 ---
-
-    // 图片序列动画的构造函数 (保持不变)
+    // 构造函数
     Animation(const std::string& anim_name, bool is_loop = false)
-        : name(anim_name), loop(is_loop), type(Type::IMAGE_SEQUENCE) {
+        : name(anim_name), type(Type::IMAGE_SEQUENCE), loop(is_loop) {
         image_sequence.frames = new std::vector<AnimationFrame>();
     }
-
-    // 新增：程序化动画的构造函数
-    Animation(const std::string& anim_name, lvgl_anim_creator_t creator)
-        : name(anim_name), loop(true), type(Type::LVGL_PROGRAMMATIC) {
+    
+    Animation(const std::string& anim_name, ProgrammaticAnimCreator creator)
+        : name(anim_name), type(Type::LVGL_PROGRAMMATIC), loop(true) {
         programmatic.creator_func = creator;
     }
+    
+    // 拷贝构造函数，处理深拷贝
+    Animation(const Animation& other)
+        : name(other.name), type(other.type), loop(other.loop) {
+        if (type == Type::IMAGE_SEQUENCE) {
+            image_sequence.frames = new std::vector<AnimationFrame>(*other.image_sequence.frames);
+        } else {
+            programmatic.creator_func = other.programmatic.creator_func;
+        }
+    }
 
-    // 默认构造函数
-    Animation() : name(""), loop(false), type(Type::IMAGE_SEQUENCE) {}
+    // 赋值运算符
+    Animation& operator=(const Animation& other) {
+        if (this != &other) {
+            // 清理旧资源
+            if (type == Type::IMAGE_SEQUENCE) {
+                delete image_sequence.frames;
+            }
+            // 拷贝新数据
+            name = other.name;
+            type = other.type;
+            loop = other.loop;
+            if (type == Type::IMAGE_SEQUENCE) {
+                image_sequence.frames = new std::vector<AnimationFrame>(*other.image_sequence.frames);
+            } else {
+                programmatic.creator_func = other.programmatic.creator_func;
+            }
+        }
+        return *this;
+    }
 
+    // 析构函数，释放内存
+    ~Animation() {
+        if (type == Type::IMAGE_SEQUENCE) {
+            delete image_sequence.frames;
+        }
+    }
 
-    void AddFrame(const lv_img_dsc_t* left, const lv_img_dsc_t* right, uint32_t duration) {
-        if (type == Type::IMAGE_SEQUENCE && image_sequence.frames) {
-            image_sequence.frames->emplace_back(left, right, duration);
+    // 辅助函数
+    void AddFrame(const lv_img_dsc_t* left, const lv_img_dsc_t* right, int duration) {
+        if (type == Type::IMAGE_SEQUENCE) {
+            image_sequence.frames->push_back({left, right, duration});
         }
     }
 
     bool IsValid() const {
-        if (name.empty()) return false;
         if (type == Type::IMAGE_SEQUENCE) {
             return image_sequence.frames != nullptr && !image_sequence.frames->empty();
         }
-        return programmatic.creator_func != nullptr;
+        if (type == Type::LVGL_PROGRAMMATIC) {
+            return programmatic.creator_func != nullptr;
+        }
+        return false;
     }
 };
 

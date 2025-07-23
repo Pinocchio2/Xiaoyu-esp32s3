@@ -324,20 +324,24 @@ void EyeAnimationDisplay::Unlock() {
 
 
 void EyeAnimationDisplay::SetEmotion(const char* emotion) {
-   // ESP_LOGI(TAG, "设置眼睛表情: %s", emotion ? emotion : "null");
-    
-    if (emotion == nullptr) {
-        ESP_LOGW(TAG, "表情名称为空，使用默认表情");
-        emotion = "neutral";
-    }
-    
-    // 从 EmotionManager 获取动画
-    const Animation& animation = EmotionManager::GetInstance().GetAnimation(std::string(emotion));
-    
-    // 播放动画
-    if (!PlayAnimation(animation)) {
-        ESP_LOGE(TAG, "播放表情动画失败: %s", emotion);
-        // 尝试播放默认动画
-        PlayAnimation(EmotionManager::GetInstance().GetDefaultAnimation());
-    }
+    // 直接委托给EmotionManager的异步处理方法
+    EmotionManager::GetInstance().ProcessEmotionAsync(emotion);
 }
+// {
+//    // ESP_LOGI(TAG, "设置眼睛表情: %s", emotion ? emotion : "null");
+    
+//     if (emotion == nullptr) {
+//         ESP_LOGW(TAG, "表情名称为空，使用默认表情");
+//         emotion = "neutral";
+//     }
+    
+//     // 从 EmotionManager 获取动画
+//     const Animation& animation = EmotionManager::GetInstance().GetAnimation(std::string(emotion));
+    
+//     // 播放动画
+//     if (!PlayAnimation(animation)) {
+//         ESP_LOGE(TAG, "播放表情动画失败: %s", emotion);
+//         // 尝试播放默认动画
+//         PlayAnimation(EmotionManager::GetInstance().GetDefaultAnimation());
+//     }
+// }

@@ -1,11 +1,17 @@
 #include "emotion_manager.h"
 #include <esp_log.h>
 #include <cmath> 
+#include <cstring> // <--- 新增：为了使用 strncpy
 
 #include "emotion_animation.h"
+#include "eye_animation_display.h"  // 添加这个头文件包含
+#include "board.h" // <--- 新增：为了使用 Board::GetInstance()
 #include "ui/eye.h"
 
 const char* EmotionManager::TAG = "EmotionManager";
+
+QueueHandle_t EmotionManager::emotion_queue_ = nullptr;
+TaskHandle_t EmotionManager::emotion_task_handle_ = nullptr;
 
 // 定义圆周率常量
 #ifndef LV_PI
@@ -207,49 +213,119 @@ void create_dual_breathing_eye_animation(lv_obj_t* parent_left, lv_obj_t* parent
 }
 // ================================================================
 
-EmotionManager::EmotionManager() {
-    // 创建呼吸式闭眼动画，更加自然
-    Animation default_anim("default", true);  // 循环播放
-    
-    default_anim.AddFrame(&sleep0, &sleep0, 200);
-    default_anim.AddFrame(&sleep1, &sleep1, 200);  
-    default_anim.AddFrame(&sleep2, &sleep2, 200);  
-    default_anim.AddFrame(&sleep3, &sleep3, 500); 
-    default_anim.AddFrame(&sleep2, &sleep2, 200);
-    default_anim.AddFrame(&sleep1, &sleep1, 200);
-    
-    default_animation_ = default_anim;
+
+
+// ================================================================
+
+// 单例模式实现：获取 EmotionManager 实例
+EmotionManager& EmotionManager::GetInstance() {
+    static EmotionManager instance;  // 静态局部变量，确保只创建一次
+    return instance;
 }
 
+EmotionManager::EmotionManager() : default_animation_("default", true) 
+{
+    // 创建一个临时的动画对象，用于定义默认动画的内容
+    Animation sleep_anim("default", true); 
+    sleep_anim.AddFrame(&sleep0, &sleep0, 200);
+    sleep_anim.AddFrame(&sleep1, &sleep1, 200);  
+    sleep_anim.AddFrame(&sleep2, &sleep2, 200);  
+    sleep_anim.AddFrame(&sleep3, &sleep3, 500); 
+    sleep_anim.AddFrame(&sleep2, &sleep2, 200);
+    sleep_anim.AddFrame(&sleep1, &sleep1, 200);
+    
+    // 将初始化好的动画内容赋值给成员变量
+    default_animation_ = sleep_anim;
+    
+    // 创建表情队列
+    emotion_queue_ = xQueueCreate(10, sizeof(EmotionMessage));
+    if (emotion_queue_ == nullptr) {
+        ESP_LOGE(TAG, "创建表情队列失败");
+        return;
+    }
+    
+    // 创建表情处理任务
+    xTaskCreatePinnedToCore(
+        EmotionTaskWrapper, "emotion_task", 4096, this, 5, &emotion_task_handle_, 1);
+    
+    ESP_LOGI(TAG, "表情队列系统初始化完成");
+}
+
+EmotionManager::~EmotionManager() {
+    if (emotion_task_handle_ != nullptr) vTaskDelete(emotion_task_handle_);
+    if (emotion_queue_ != nullptr) vQueueDelete(emotion_queue_);
+}
+
+void EmotionManager::EmotionTaskWrapper(void* param) {
+    static_cast<EmotionManager*>(param)->EmotionTask();
+}
+
+void EmotionManager::EmotionTask() {
+    EmotionMessage msg;
+    ESP_LOGI(TAG, "表情处理任务启动");
+    while (true) {
+        if (xQueueReceive(emotion_queue_, &msg, portMAX_DELAY) == pdTRUE) {
+            ESP_LOGD(TAG, "处理表情请求: %s", msg.emotion_name);
+            
+            auto display = Board::GetInstance().GetDisplay();
+            if (display != nullptr) {
+                const Animation& animation = GetAnimation(std::string(msg.emotion_name));
+                
+                // 使用虚函数，避免类型转换
+                display->PlayAnimation(animation);
+            } else {
+                ESP_LOGW(TAG, "获取显示器实例失败");
+            }
+        }
+    }
+}
+
+void EmotionManager::ProcessEmotionAsync(const char* emotion_name) {
+    if (emotion_queue_ == nullptr || emotion_name == nullptr) {
+        ESP_LOGW(TAG, "表情队列未初始化或表情名称为空");
+        return;
+    }
+    
+    EmotionMessage msg;
+    strncpy(msg.emotion_name, emotion_name, sizeof(msg.emotion_name) - 1);
+    msg.emotion_name[sizeof(msg.emotion_name) - 1] = '\0';
+    msg.timestamp = xTaskGetTickCount();
+    
+    if (xQueueSend(emotion_queue_, &msg, 0) != pdTRUE) {
+        EmotionMessage old_msg;
+        if (xQueueReceive(emotion_queue_, &old_msg, 0) == pdTRUE) {
+            ESP_LOGD(TAG, "丢弃旧表情请求: %s", old_msg.emotion_name);
+            xQueueSend(emotion_queue_, &msg, 0);
+        } else {
+            ESP_LOGW(TAG, "表情队列满，丢弃请求: %s", emotion_name);
+        }
+    }
+}
 
 const Animation& EmotionManager::GetAnimation(const std::string& emotion_name) {
     auto it = animations_.find(emotion_name);
     if (it != animations_.end()) {
-        ESP_LOGD(TAG, "找到表情动画: %s", emotion_name.c_str());
         return it->second;
     }
-    
-    ESP_LOGW(TAG, "未找到表情动画 '%s'，使用默认中性表情", emotion_name.c_str());
+    ESP_LOGW(TAG, "未找到表情动画 '%s'，使用默认表情", emotion_name.c_str());
     return default_animation_;
 }
 
 void EmotionManager::PreloadAllAnimations() {
-    
     ESP_LOGI(TAG, "开始预加载所有表情动画...");
     InitializeAnimations();    
     ESP_LOGI(TAG, "表情动画预加载完成，共加载 %d 个动画", animations_.size());
 }
 
+// 关键修改：只保留一个 RegisterAnimation 函数定义
 void EmotionManager::RegisterAnimation(const std::string& emotion_name, const Animation& animation) {
-    
     if (!animation.IsValid()) {     
         ESP_LOGE(TAG, "尝试注册无效的动画: %s", emotion_name.c_str());
         return;
     }
     
-
-    animations_[emotion_name] = animation;
-    // 修复：根据动画类型访问正确的成员
+    animations_.insert({emotion_name, animation});
+    
     if (animation.type == Animation::Type::IMAGE_SEQUENCE && animation.image_sequence.frames) {
         ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.image_sequence.frames->size());
     } else {
@@ -257,9 +333,7 @@ void EmotionManager::RegisterAnimation(const std::string& emotion_name, const An
     }
 }
 
-// 检查emotion_name是否存在于animations_中
 bool EmotionManager::HasAnimation(const std::string& emotion_name) const {
-    // 如果animations_中存在emotion_name，则返回true，否则返回false
     return animations_.find(emotion_name) != animations_.end();
 }
 

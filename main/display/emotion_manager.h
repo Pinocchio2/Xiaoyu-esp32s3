@@ -1,78 +1,54 @@
 #ifndef EMOTION_MANAGER_H
 #define EMOTION_MANAGER_H
 
-#include "emotion_animation.h"
-#include "ui/eye.h"
 #include <map>
-#include <memory>
-#include <esp_log.h>
+#include <string>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "emotion_animation.h"
 
-/**
- * @brief 表情动画管理器
- * 单例模式，负责管理所有预定义的表情动画
- */
+// 消息结构体定义
+struct EmotionMessage {
+    char emotion_name[32];
+    uint32_t timestamp;
+};
+
 class EmotionManager {
 public:
-    // 获取单例实例
-    static EmotionManager& GetInstance() {
-        static EmotionManager instance;
-        return instance;
-    }
-    
-    // 初始化所有预定义的表情动画
-    void InitializeAnimations();
-   
-    const Animation& GetAnimation(const std::string& emotion_name);
-    
-    
+    static EmotionManager& GetInstance();
     void PreloadAllAnimations();
-   
-    void RegisterAnimation(const std::string& emotion_name, const Animation& animation);
-    
-    
-    bool HasAnimation(const std::string& emotion_name) const;
-    
-   
+    const Animation& GetAnimation(const std::string& emotion_name);
+    void ProcessEmotionAsync(const char* emotion_name);
     const Animation& GetDefaultAnimation() const;
+    bool HasAnimation(const std::string& emotion_name) const;
 
 private:
-    // 私有构造函数（单例模式）
     EmotionManager();
-    
-    // 禁用拷贝构造和赋值操作
+    ~EmotionManager();
     EmotionManager(const EmotionManager&) = delete;
     EmotionManager& operator=(const EmotionManager&) = delete;
-    
-    // 创建静态表情动画的辅助方法
-    Animation CreateStaticEmotion(const std::string& name, 
-                                const lv_img_dsc_t* left_eye, 
-                                const lv_img_dsc_t* right_eye);
-    
-    // 创建动态表情动画的辅助方法
-    Animation CreateDynamicEmotion(const std::string& name, 
-                                 const std::vector<AnimationFrame>& frames, 
-                                 bool loop = false);
-    
-    // 创建眨眼动画的辅助方法
+
+    void InitializeAnimations();
+    void RegisterAnimation(const std::string& emotion_name, const Animation& animation);
+
+    static void EmotionTaskWrapper(void* param);
+    void EmotionTask();
+
+    Animation CreateStaticEmotion(const std::string& name, const lv_img_dsc_t* left_eye, const lv_img_dsc_t* right_eye);
+    Animation CreateDynamicEmotion(const std::string& name, const std::vector<AnimationFrame>& frames, bool loop = false);
     Animation CreateBlinkingAnimation();
-    
-    // 创建眨眼循环动画的辅助方法
-    // Animation CreateWinkingAnimation();
-    
     Animation CreateYanzhuAnimation();
-
     Animation CreateYanzhuScaleAnimation();
-
-    // 新增微笑动画创建方法
     Animation CreateSmileAnimation();
-
-    //新增睡眠动画
     Animation CreateSleepAnimation();
-    
-    std::map<std::string, Animation> animations_;  // 存储所有表情动画的映射表
-    Animation default_animation_;                   // 默认的中性表情动画
-    
-    static const char* TAG;  // 日志标签
+
+    std::map<std::string, Animation> animations_;
+    Animation default_animation_;
+
+    static QueueHandle_t emotion_queue_;
+    static TaskHandle_t emotion_task_handle_;
+    static const char* TAG;
 };
 
 #endif // EMOTION_MANAGER_H
