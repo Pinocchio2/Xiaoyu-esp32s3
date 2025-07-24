@@ -1,6 +1,7 @@
 //#include "display.h"
 #include "eye_animation_display.h"
 #include "emotion_manager.h"
+#include "emotion_animation.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_lvgl_port.h"
@@ -47,56 +48,62 @@ void EyeAnimationDisplay::StopAnimation() {
  * @brief 播放动画（已重构为调度器）
  */
 bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
+    // 1. 验证传入的动画是否有效
     if (!animation.IsValid()) {
-        ESP_LOGW(TAG, "无效的动画");
+        ESP_LOGW(TAG, "无效的动画，无法播放: %s", animation.name.c_str());
         return false;
     }
 
+    // 2. 加锁，保证所有 LVGL 操作的线程安全
     DisplayLockGuard lock(this);
     
-    // 统一停止上一个动画 - 移到这里确保所有分支都会执行
+    // 3. 统一停止上一个动画，确保状态被重置
     StopAnimation();
 
-    //ESP_LOGI(TAG, "请求播放动画: %s (类型: %s)", animation.name.c_str(),
-            // animation.type == Animation::Type::IMAGE_SEQUENCE ? "图片序列" : "程序化");
-             
+    // 4. 获取左右两个屏幕的引用
     lv_obj_t* scr_left = primary_display_ ? lv_disp_get_scr_act(primary_display_->getLvDisplay()) : nullptr;
     lv_obj_t* scr_right = secondary_display_ ? lv_disp_get_scr_act(secondary_display_->getLvDisplay()) : nullptr;
 
-    if (!scr_left || !scr_right) return false;
+    if (!scr_left || !scr_right) {
+        ESP_LOGE(TAG, "无法获取屏幕对象");
+        return false;
+    }
 
-    // 根据动画类型选择播放逻辑
-    if (animation.type == Animation::Type::LVGL_PROGRAMMATIC) {
-        // 确保停止所有之前的动画和定时器
-        is_programmatic_anim_active_ = true;
-        if (animation.programmatic.creator_func) {
-             animation.programmatic.creator_func(scr_left, scr_right);
+    // 5. 【核心逻辑】使用 std::visit 或 std::get_if 判断动画类型并执行
+    // 这里使用 std::get_if, 代码更简洁
+    
+    // 5.1. 如果是程序化动画 (Programmatic)
+    if (const auto* prog_data = std::get_if<ProgrammaticData>(&animation.data)) {
+        is_programmatic_anim_active_ = true; // 标记当前为程序化动画
+        if (prog_data->creator_func) {
+            // 直接调用动画的创建函数
+            prog_data->creator_func(scr_left, scr_right);
         }
-
-    } else {
-        is_programmatic_anim_active_ = false;
+    } 
+    // 5.2. 如果是图片序列动画 (Image Sequence)
+    else if (const auto* seq_data = std::get_if<ImageSequenceData>(&animation.data)) {
+        is_programmatic_anim_active_ = false; // 清除程序化动画标记
         
-        // **关键修正**: 如果img对象不存在 (可能被上次的程序化动画清除了)，则重新创建它们
+        // 健壮性处理：如果 lv_img 对象不存在（可能被程序化动画的 lv_obj_clean 清除了），则重新创建
         if (!left_eye_img_) {
             left_eye_img_ = lv_img_create(scr_left);
             lv_obj_align(left_eye_img_, LV_ALIGN_CENTER, 0, 0);
-            //ESP_LOGI(TAG, "重新创建左眼图像对象");
         }
         if (!right_eye_img_) {
             right_eye_img_ = lv_img_create(scr_right);
             lv_obj_align(right_eye_img_, LV_ALIGN_CENTER, 0, 0);
-            ///ESP_LOGI(TAG, "重新创建右眼图像对象");
         }
         
-        // 确保它们可见
+        // 确保图像对象是可见的
         lv_obj_clear_flag(left_eye_img_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(right_eye_img_, LV_OBJ_FLAG_HIDDEN);
         
-        
+        // 设置动画状态变量
         current_animation_ = &animation;
         is_looping_ = animation.loop;
         current_frame_index_ = 0;
         
+        // 确保定时器已创建
         if (!animation_timer_) {
             esp_timer_create_args_t timer_args = {
                 .callback = &EyeAnimationDisplay::animation_timer_callback,
@@ -105,7 +112,7 @@ bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
             esp_timer_create(&timer_args, &animation_timer_);
         }
         
-        // 立即启动第一帧 (通过任务通知)
+        // 通过任务通知，立即启动第一帧的播放
         if(animation_task_handle_) {
             xTaskNotifyGive(animation_task_handle_);
         }
@@ -113,7 +120,6 @@ bool EyeAnimationDisplay::PlayAnimation(const Animation& animation) {
     
     return true;
 }
-
 
 
 // 在构造函数中创建任务
@@ -271,46 +277,69 @@ void EyeAnimationDisplay::update_image_callback(void* user_data) {
 // in file: main/display/eye_animation_display.cc
 
 void EyeAnimationDisplay::PlayNextFrame() {
-    // 步骤 1: 加上之前建议的锁，这是保证线程安全的前提
+    // 1. 加锁，保证 LVGL 操作的线程安全
     DisplayLockGuard lock(this);
 
-    // 步骤 2: 检查当前动画状态，这部分逻辑不变
-    if (!current_animation_ ||
-        current_animation_->type != Animation::Type::IMAGE_SEQUENCE ||
-        !current_animation_->image_sequence.frames ||
-        current_frame_index_ >= static_cast<int>(current_animation_->image_sequence.frames->size())) {
-        ESP_LOGW(TAG, "无效的动画状态");
+    // 2. 检查当前是否正在播放一个有效的图片序列动画
+    if (!current_animation_) {
+        return; // 没有动画在播放
+    }
+    
+    const auto* seq_data = std::get_if<ImageSequenceData>(&current_animation_->data);
+    if (!seq_data) {
+        return; // 当前动画不是图片序列类型
+    }
+
+    // 3. 检查帧索引是否越界
+    if (current_frame_index_ >= seq_data->frames.size()) {
+        // 这种情况理论上会在下面的结束判断中处理，但作为防御性编程保留
         return;
     }
 
-    const auto& frame = (*current_animation_->image_sequence.frames)[current_frame_index_];
+    // 4. 获取当前要播放的帧
+    const auto& frame = seq_data->frames[current_frame_index_];
 
-    // 步骤 3: 【核心修改】直接调用 lv_img_set_src, 替换掉原来的 lv_async_call
+    // 5. 将当前帧的图像设置到左右眼的图像对象上
     if (frame.left_eye_image && left_eye_img_) {
         lv_img_set_src(left_eye_img_, frame.left_eye_image);
     }
-
     if (frame.right_eye_image && right_eye_img_) {
         lv_img_set_src(right_eye_img_, frame.right_eye_image);
     }
 
-    // 步骤 4: 播放完当前帧后，启动下一帧的定时器，逻辑不变
-    if (frame.duration_ms > 0) {
-        esp_timer_start_once(animation_timer_, frame.duration_ms * 1000);
-    }
-
+    // 6. 帧索引递增，为下一帧做准备
     current_frame_index_++;
 
-    // 步骤 5: 判断动画是否结束，逻辑不变
-    if (current_frame_index_ >= static_cast<int>(current_animation_->image_sequence.frames->size())) {
+    // 7. 判断动画是否播放完毕
+    if (current_frame_index_ >= seq_data->frames.size()) {
+        // 7.1. 如果是循环动画
         if (is_looping_) {
-            current_frame_index_ = 0; // 循环播放则重置索引
+            current_frame_index_ = 0; // 重置帧索引到第一帧
+            // 重新获取第一帧，并为其设置定时器，以实现无缝循环
+            const auto& first_frame = seq_data->frames[0];
+            if (first_frame.duration_ms > 0) {
+                esp_timer_start_once(animation_timer_, first_frame.duration_ms * 1000);
+            } else {
+                // 如果第一帧持续时间为0，可能需要立即通知任务播放下一帧
+                 xTaskNotifyGive(animation_task_handle_);
+            }
+        } 
+        // 7.2. 如果是不循环的动画
+        else {
+            StopAnimation(); // 动画结束，停止并清理
+        }
+    } 
+    // 8. 如果动画未结束，为下一帧设置定时器
+    else {
+         // 使用下一帧的持续时间（即当前帧显示的时长）
+        if (frame.duration_ms > 0) {
+            esp_timer_start_once(animation_timer_, frame.duration_ms * 1000);
         } else {
-            StopAnimation(); // 不循环则停止动画
+             // 如果持续时间为0，立即通知任务播放紧接着的下一帧
+             xTaskNotifyGive(animation_task_handle_);
         }
     }
 }
-
 
 bool EyeAnimationDisplay::Lock(int timeout_ms) {
     // 使用LVGL端口锁定

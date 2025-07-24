@@ -318,16 +318,33 @@ void EmotionManager::PreloadAllAnimations() {
 }
 
 // 关键修改：只保留一个 RegisterAnimation 函数定义
+// void EmotionManager::RegisterAnimation(const std::string& emotion_name, const Animation& animation) {
+//     if (!animation.IsValid()) {     
+//         ESP_LOGE(TAG, "尝试注册无效的动画: %s", emotion_name.c_str());
+//         return;
+//     }
+    
+//     animations_.insert({emotion_name, animation});
+    
+//     if (animation.type == Animation::Type::IMAGE_SEQUENCE && animation.image_sequence.frames) {
+//         ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.image_sequence.frames->size());
+//     } else {
+//         ESP_LOGD(TAG, "注册表情动画: %s (程序化动画)", emotion_name.c_str());
+//     }
+// }
+
 void EmotionManager::RegisterAnimation(const std::string& emotion_name, const Animation& animation) {
     if (!animation.IsValid()) {     
         ESP_LOGE(TAG, "尝试注册无效的动画: %s", emotion_name.c_str());
         return;
     }
-    
-    animations_.insert({emotion_name, animation});
-    
-    if (animation.type == Animation::Type::IMAGE_SEQUENCE && animation.image_sequence.frames) {
-        ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), animation.image_sequence.frames->size());
+
+    // 【修改】使用 emplace 或下标赋值，更安全高效
+    animations_.emplace(emotion_name, animation);
+
+    // 【修改】使用 std::get_if 访问 variant
+    if (const auto* seq_data = std::get_if<ImageSequenceData>(&animation.data)) {
+        ESP_LOGD(TAG, "注册表情动画: %s (帧数: %d)", emotion_name.c_str(), seq_data->frames.size());
     } else {
         ESP_LOGD(TAG, "注册表情动画: %s (程序化动画)", emotion_name.c_str());
     }

@@ -4,6 +4,8 @@
 #include "display.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "emotion_manager.h"
+#include "emotion_animation.h"
 
 class EyeAnimationDisplay : public Display {
 public:
@@ -12,8 +14,14 @@ public:
 
     virtual bool PlayAnimation(const Animation& animation) override;
     virtual void SetEmotion(const char* emotion) override;
-
-    // ... 其他函数保持不变 ...
+    
+    // 添加空实现来禁用UI文本显示
+    virtual void SetStatus(const char* status) override {}
+    virtual void ShowNotification(const char* notification, int duration_ms = 3000) override {}
+    virtual void ShowNotification(const std::string &notification, int duration_ms = 3000) override {}
+    virtual void SetChatMessage(const char* role, const char* content) override {}
+    virtual void SetIcon(const char* icon) override {}
+    virtual void SetTheme(const std::string& theme_name) override {}
 
 protected:
     virtual bool Lock(int timeout_ms = 0) override;

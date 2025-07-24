@@ -10,6 +10,7 @@
 #include <atomic>
 
 class LcdDisplay : public Display {
+    friend class EyeAnimationDisplay;  // 添加友元类声明
 protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
